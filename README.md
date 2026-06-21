@@ -37,7 +37,7 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 | --- | --- | --- |
 | **Core Backend** | Laravel 12.x | Secure MVC framework, routing, migrations, seeders, and Eloquent ORM. |
 | **Frontend** | React SPA (Inertia.js) | Reactive frontend views without the API-token authentication overhead. |
-| **CSS Styling** | Tailwind CSS / HSL CSS | Curated dark-themed glassmorphism layout, subtle micro-animations, and alerts. |
+| **CSS Styling** | Tailwind CSS / HSL CSS | Unified dark-theme glassmorphism layout, custom SVG academic emblem, custom form widgets, and glow indicators. |
 | **MLOps & Analytics** | Python 3.14 + FastAPI | Machine learning pipeline, early warning inference API. |
 | **Database** | MariaDB / MySQL | Relational data store, configured on custom port `3307` for environment safety. |
 
@@ -141,6 +141,11 @@ For development safety and to prevent conflicting with existing default database
    ```powershell
    npm install
    npm run build
+   ```
+   *Note: If node/npm are not in your system's PATH on Windows, you can locate them under `C:\Program Files\nodejs` and execute:*
+   ```powershell
+   $env:Path += ";C:\Program Files\nodejs"
+   & "C:\Program Files\nodejs\npm.cmd" run build
    ```
 3. Start the Laravel development server:
    ```powershell

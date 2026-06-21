@@ -3,15 +3,21 @@ import { Link } from '@inertiajs/react';
 
 export default function GuestLayout({ children }) {
     return (
-        <div className="flex min-h-screen flex-col items-center bg-gray-100 pt-6 sm:justify-center sm:pt-0 dark:bg-gray-900">
-            <div>
-                <Link href="/">
-                    <ApplicationLogo className="h-20 w-20 fill-current text-gray-500" />
-                </Link>
-            </div>
+        <div className="relative min-h-screen bg-slate-950 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 overflow-hidden font-sans">
+            {/* Glowing background circles for visual depth */}
+            <div className="absolute top-1/4 left-1/4 h-[350px] w-[350px] rounded-full bg-indigo-500/10 blur-[80px] pointer-events-none animate-pulse" />
+            <div className="absolute bottom-1/4 right-1/4 h-[350px] w-[350px] rounded-full bg-emerald-500/10 blur-[80px] pointer-events-none animate-pulse" />
 
-            <div className="mt-6 w-full overflow-hidden bg-white px-6 py-4 shadow-md sm:max-w-md sm:rounded-lg dark:bg-gray-800">
-                {children}
+            <div className="relative z-10 w-full max-w-md flex flex-col items-center">
+                <div className="mb-6 h-16 w-16">
+                    <Link href="/">
+                        <ApplicationLogo className="h-full w-full" />
+                    </Link>
+                </div>
+
+                <div className="w-full bg-slate-900/40 backdrop-blur-xl border border-slate-800/80 rounded-2xl shadow-2xl p-8 transition-all duration-300 hover:border-indigo-500/30 shadow-indigo-500/5">
+                    {children}
+                </div>
             </div>
         </div>
     );
