@@ -4,8 +4,8 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 import joblib
-import pymysql
-import pymysql.cursors
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import QueuePool
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "early_warning_model.joblib")
 SCALER_PATH = os.path.join(os.path.dirname(__file__), "scaler.joblib")
@@ -17,19 +17,23 @@ DB_NAME = os.getenv("DB_DATABASE", "ims_db")
 DB_USER = os.getenv("DB_USERNAME", "root")
 DB_PASS = os.getenv("DB_PASSWORD", "")
 
-def get_db_connection():
-    try:
-        return pymysql.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASS,
-            database=DB_NAME,
-            cursorclass=pymysql.cursors.DictCursor
-        )
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        return None
+# Construct DB URL for connection pooling (supporting password-less connections)
+DB_USER_ESC = DB_USER.replace(":", "%3a").replace("@", "%40") if DB_USER else "root"
+DB_PASS_ESC = DB_PASS.replace(":", "%3a").replace("@", "%40") if DB_PASS else ""
+DATABASE_URL = f"mysql+pymysql://{DB_USER_ESC}:{DB_PASS_ESC}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+engine = None
+try:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=5,
+        max_overflow=10,
+        pool_recycle=3600,
+        pool_pre_ping=True
+    )
+except Exception as e:
+    print(f"Error initializing SQLAlchemy pool in model: {e}")
 
 def generate_synthetic_data(n_samples=1000):
     np.random.seed(42)
@@ -43,19 +47,12 @@ def generate_synthetic_data(n_samples=1000):
     consecutive_absences = np.random.poisson(lam=1.5, size=n_samples)
     late_days = np.random.poisson(lam=2.0, size=n_samples)
     
-    # Ground truth labeling logic:
-    # High risk of falling behind if:
-    # - attendance is very low (< 75%)
-    # - grades are very low (< 60)
-    # - high consecutive absences (> 3)
-    # Add some noise to make it realistic
     scores = (
         (1.0 - attendance_rate) * 5.0 +
         (100.0 - avg_grade) * 0.1 +
         consecutive_absences * 0.8 +
         late_days * 0.2
     )
-    # Threshold for at-risk (1 = high risk, 0 = low risk)
     threshold = np.percentile(scores, 75)  # top 25% are labeled at-risk
     labels = (scores >= threshold).astype(int)
     
@@ -69,15 +66,14 @@ def generate_synthetic_data(n_samples=1000):
     return df
 
 def get_student_features_from_db():
-    db = get_db_connection()
-    if not db:
+    if not engine:
         return None
         
     try:
-        with db.cursor() as cursor:
+        with engine.connect() as conn:
             # Fetch all enrolled students
-            cursor.execute("SELECT id, student_id FROM students WHERE status = 'enrolled'")
-            students = cursor.fetchall()
+            result = conn.execute(text("SELECT id, student_id FROM students WHERE status = 'enrolled'"))
+            students = result.mappings().all()
             if not students:
                 return None
                 
@@ -87,11 +83,11 @@ def get_student_features_from_db():
                 student_id = s["id"]
                 
                 # Query attendance
-                cursor.execute(
-                    "SELECT status FROM attendance WHERE student_id = %s ORDER BY date DESC",
-                    (student_id,)
+                result_att = conn.execute(
+                    text("SELECT status FROM attendance WHERE student_id = :id ORDER BY date DESC"),
+                    {"id": student_id}
                 )
-                attendance_records = cursor.fetchall()
+                attendance_records = result_att.mappings().all()
                 
                 total_classes = len(attendance_records)
                 present_classes = sum(1 for r in attendance_records if r["status"] in ("present", "late"))
@@ -107,11 +103,11 @@ def get_student_features_from_db():
                 late_days = sum(1 for r in attendance_records if r["status"] == "late")
                 
                 # Query grades
-                cursor.execute(
-                    "SELECT marks_obtained, max_marks, weight FROM grades WHERE student_id = %s",
-                    (student_id,)
+                result_grade = conn.execute(
+                    text("SELECT marks_obtained, max_marks, weight FROM grades WHERE student_id = :id"),
+                    {"id": student_id}
                 )
-                grade_records = cursor.fetchall()
+                grade_records = result_grade.mappings().all()
                 
                 total_weight = sum(float(r["weight"]) for r in grade_records)
                 weighted_marks = sum(
@@ -131,8 +127,6 @@ def get_student_features_from_db():
     except Exception as e:
         print(f"Error fetching training data from DB: {e}")
         return None
-    finally:
-        db.close()
 
 def load_training_data():
     df_db = get_student_features_from_db()
@@ -183,9 +177,23 @@ def get_risk_prediction(attendance_rate, avg_grade, consecutive_absences, late_d
     scaler = joblib.load(SCALER_PATH)
     
     features = np.array([[attendance_rate, avg_grade, consecutive_absences, late_days]])
-    features_scaled = scaler.transform(features)
+    features_scaled = scaler.transform(features)[0]
     
-    risk_probability = float(model.predict_proba(features_scaled)[0][1])
+    coefficients = model.coef_[0]
+    feature_names = ['Attendance Rate', 'Average Grade', 'Consecutive Absences', 'Late Days']
+    contributions = []
+    
+    for name, coef, val, raw_val in zip(feature_names, coefficients, features_scaled, [attendance_rate, avg_grade, consecutive_absences, late_days]):
+        contrib = float(coef * val)
+        contributions.append({
+            "feature": name,
+            "contribution": contrib,
+            "raw_value": float(raw_val)
+        })
+        
+    contributions.sort(key=lambda x: x["contribution"], reverse=True)
+    
+    risk_probability = float(model.predict_proba(scaler.transform(features))[0][1])
     
     if risk_probability < 0.35:
         level = "Low Risk"
@@ -194,9 +202,28 @@ def get_risk_prediction(attendance_rate, avg_grade, consecutive_absences, late_d
     else:
         level = "High Risk"
         
+    reasons = []
+    for c in contributions:
+        if c["contribution"] > 0:
+            if c["feature"] == "Attendance Rate":
+                reasons.append(f"low attendance ({round(c['raw_value'] * 100)}%)")
+            elif c["feature"] == "Average Grade":
+                reasons.append(f"low academic performance ({round(c['raw_value'])}% average)")
+            elif c["feature"] == "Consecutive Absences" and c["raw_value"] > 0:
+                reasons.append(f"{int(c['raw_value'])} consecutive absences")
+            elif c["feature"] == "Late Days" and c["raw_value"] > 0:
+                reasons.append(f"frequent lateness ({int(c['raw_value'])} days)")
+                
+    if not reasons or risk_probability < 0.35:
+        explanation = "Academic progress and attendance metrics are aligned with general standards."
+    else:
+        explanation = f"Primary risk drivers: {', '.join(reasons)}."
+        
     return {
         "risk_score": round(risk_probability * 100, 2),
         "risk_level": level,
+        "explanation": explanation,
+        "contributions": contributions,
         "metrics": {
             "attendance_rate": attendance_rate,
             "avg_grade": avg_grade,

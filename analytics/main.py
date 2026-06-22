@@ -1,12 +1,12 @@
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import pymysql
-import pymysql.cursors
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from datetime import datetime
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import QueuePool
 
 # Import ML predict utility
 from model import get_risk_prediction, train_and_save_model
@@ -33,26 +33,36 @@ DB_NAME = os.getenv("DB_DATABASE", "ims_db")
 DB_USER = os.getenv("DB_USERNAME", "root")
 DB_PASS = os.getenv("DB_PASSWORD", "")
 
-def get_db_connection():
-    try:
-        return pymysql.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASS,
-            database=DB_NAME,
-            cursorclass=pymysql.cursors.DictCursor
-        )
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        return None
+# Construct DB URL for connection pooling (supporting password-less connections)
+DB_USER_ESC = DB_USER.replace(":", "%3a").replace("@", "%40") if DB_USER else "root"
+DB_PASS_ESC = DB_PASS.replace(":", "%3a").replace("@", "%40") if DB_PASS else ""
+DATABASE_URL = f"mysql+pymysql://{DB_USER_ESC}:{DB_PASS_ESC}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+# SQLAlchemy connection pooling engine
+engine = None
+try:
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=QueuePool,
+        pool_size=10,
+        max_overflow=20,
+        pool_recycle=3600,
+        pool_pre_ping=True
+    )
+except Exception as e:
+    print(f"SQLAlchemy database pool initialization error: {e}")
 
 @app.get("/")
 def health_check():
-    db = get_db_connection()
-    db_status = "Connected" if db else "Disconnected"
-    if db:
-        db.close()
+    db_status = "Disconnected"
+    if engine:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+                db_status = "Connected"
+        except Exception as e:
+            db_status = f"Disconnected (Error: {str(e)})"
+            
     return {
         "status": "online",
         "timestamp": datetime.now().isoformat(),
@@ -61,24 +71,23 @@ def health_check():
 
 @app.get("/predict-risk/{student_id}")
 def predict_student_risk(student_id: int):
-    db = get_db_connection()
-    if not db:
-        raise HTTPException(status_code=500, detail="Database connection unavailable")
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database connection pool unavailable")
         
     try:
-        with db.cursor() as cursor:
+        with engine.connect() as conn:
             # 1. Verify student exists
-            cursor.execute("SELECT id FROM students WHERE id = %s", (student_id,))
-            student = cursor.fetchone()
+            result = conn.execute(text("SELECT id FROM students WHERE id = :id"), {"id": student_id})
+            student = result.mappings().first()
             if not student:
                 raise HTTPException(status_code=404, detail=f"Student ID {student_id} not found")
                 
             # 2. Get attendance data
-            cursor.execute(
-                "SELECT status FROM attendance WHERE student_id = %s ORDER BY date DESC",
-                (student_id,)
+            result_att = conn.execute(
+                text("SELECT status FROM attendance WHERE student_id = :id ORDER BY date DESC"),
+                {"id": student_id}
             )
-            attendance_records = cursor.fetchall()
+            attendance_records = result_att.mappings().all()
             
             # Compute attendance rate
             total_classes = len(attendance_records)
@@ -97,11 +106,11 @@ def predict_student_risk(student_id: int):
             late_days = sum(1 for r in attendance_records if r["status"] == "late")
             
             # 3. Get grades data
-            cursor.execute(
-                "SELECT marks_obtained, max_marks, weight FROM grades WHERE student_id = %s",
-                (student_id,)
+            result_grade = conn.execute(
+                text("SELECT marks_obtained, max_marks, weight FROM grades WHERE student_id = :id"),
+                {"id": student_id}
             )
-            grade_records = cursor.fetchall()
+            grade_records = result_grade.mappings().all()
             
             # Compute weighted average grade
             total_weight = sum(float(r["weight"]) for r in grade_records)
@@ -123,21 +132,20 @@ def predict_student_risk(student_id: int):
             "prediction": prediction
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference computation error: {str(e)}")
-    finally:
-        db.close()
 
 @app.get("/forecast-enrollment")
 def forecast_enrollment():
-    db = get_db_connection()
-    if not db:
-        raise HTTPException(status_code=500, detail="Database connection unavailable")
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database connection pool unavailable")
         
     try:
-        with db.cursor() as cursor:
+        with engine.connect() as conn:
             # Query enrollment history grouped by month
-            cursor.execute("""
+            result = conn.execute(text("""
                 SELECT 
                     DATE_FORMAT(created_at, '%Y-%m') as month_str,
                     COUNT(id) as enrollment_count
@@ -145,48 +153,72 @@ def forecast_enrollment():
                 WHERE status = 'enrolled'
                 GROUP BY DATE_FORMAT(created_at, '%Y-%m')
                 ORDER BY month_str ASC
-            """)
-            records = cursor.fetchall()
+            """))
+            records = result.mappings().all()
             
-        # Parse data
-        if len(records) < 2:
-            # Seed/fallback synthetic trends if there isn't enough historical database data yet
+        # Parse data and fall back to synthetic seasonality if database lacks historical depth
+        if len(records) < 4:
             history = [
-                {"month": "2026-01", "count": 12},
-                {"month": "2026-02", "count": 18},
-                {"month": "2026-03", "count": 22},
-                {"month": "2026-04", "count": 31},
-                {"month": "2026-05", "count": 38},
-                {"month": "2026-06", "count": 45}
+                {"month": "2025-01", "count": 12},
+                {"month": "2025-02", "count": 18},
+                {"month": "2025-03", "count": 25}, # term spike
+                {"month": "2025-04", "count": 15},
+                {"month": "2025-05", "count": 10},
+                {"month": "2025-06", "count": 28}, # term spike
+                {"month": "2025-07", "count": 12},
+                {"month": "2025-08", "count": 8},
+                {"month": "2025-09", "count": 35}, # term spike
+                {"month": "2025-10", "count": 16},
+                {"month": "2025-11", "count": 11},
+                {"month": "2025-12", "count": 9},
+                {"month": "2026-01", "count": 14},
+                {"month": "2026-02", "count": 20},
+                {"month": "2026-03", "count": 27}, # term spike
+                {"month": "2026-04", "count": 17},
+                {"month": "2026-05", "count": 12},
+                {"month": "2026-06", "count": 31}
             ]
         else:
             history = [{"month": r["month_str"], "count": r["enrollment_count"]} for r in records]
             
-        # Fit Linear Regression to forecast next 3 months
+        # Classical Additive Time-Series Decomposition:
         df = pd.DataFrame(history)
         df["index"] = np.arange(len(df))
         
-        X = df[["index"]].values
+        # 1. Fit linear trend model
+        X_trend = df[["index"]].values
         y = df["count"].values
         
-        model = LinearRegression()
-        model.fit(X, y)
+        trend_model = LinearRegression()
+        trend_model.fit(X_trend, y)
         
-        # Forecast indices
-        forecast_indices = np.array([[len(df)], [len(df) + 1], [len(df) + 2]])
-        forecasted_values = model.predict(forecast_indices)
+        # Compute detrended residuals
+        df["trend"] = trend_model.predict(X_trend)
+        df["residual"] = df["count"] - df["trend"]
         
-        # Format dates for forecast
+        # 2. Extract calendar month
+        df["calendar_month"] = df["month"].apply(lambda m: int(m.split("-")[1]))
+        
+        # Calculate seasonal indices (average residual per calendar month)
+        seasonal_indices = df.groupby("calendar_month")["residual"].mean().to_dict()
+        
+        # 3. Forecast next 3 months
+        last_index = len(df) - 1
+        forecast_indices = [last_index + 1, last_index + 2, last_index + 3]
         last_date = datetime.strptime(df["month"].iloc[-1], "%Y-%m")
+        
         forecasts = []
-        for i, val in enumerate(forecasted_values):
-            # calculate target month offset
-            target_month = (last_date.month + i) % 12 + 1
-            target_year = last_date.year + (last_date.month + i) // 12
+        for offset, idx in enumerate(forecast_indices, start=1):
+            target_month = (last_date.month + offset - 1) % 12 + 1
+            target_year = last_date.year + (last_date.month + offset - 1) // 12
             month_str = f"{target_year}-{target_month:02d}"
             
-            # Value cannot be negative
-            count_pred = int(max(0, round(val)))
+            trend_val = float(trend_model.predict(np.array([[idx]]))[0])
+            season_offset = float(seasonal_indices.get(target_month, 0.0))
+            
+            final_forecast = trend_val + season_offset
+            count_pred = int(max(0, round(final_forecast)))
+            
             forecasts.append({"month": month_str, "count": count_pred, "is_forecast": True})
             
         history_list = [{"month": h["month"], "count": h["count"], "is_forecast": False} for h in history]
@@ -194,14 +226,12 @@ def forecast_enrollment():
         return {
             "history": history_list,
             "forecast": forecasts,
-            "slope": float(model.coef_[0]),
-            "intercept": float(model.intercept_)
+            "slope": float(trend_model.coef_[0]),
+            "intercept": float(trend_model.intercept_)
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Forecasting error: {str(e)}")
-    finally:
-        db.close()
 
 @app.post("/train")
 def train_model():
