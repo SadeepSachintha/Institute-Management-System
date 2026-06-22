@@ -22,4 +22,7 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-/dist
+/dist/win-unpacked/locales
+/dist/win-unpacked/ims-core.exe
+/dist/win-unpacked/resources/app/node_modules
+/dist/IMS Core-1.0.0-setup.exe
