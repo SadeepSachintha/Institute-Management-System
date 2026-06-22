@@ -13,7 +13,7 @@ export default function AuthenticatedLayout({ header, children }) {
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100">
-            <nav className="border-b border-slate-900 bg-slate-950/85 backdrop-blur-md">
+            <nav className="relative z-50 border-b border-slate-900 bg-slate-950/85 backdrop-blur-md">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 justify-between">
                         <div className="flex">
