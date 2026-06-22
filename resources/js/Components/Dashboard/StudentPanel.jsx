@@ -150,6 +150,17 @@ export default function StudentPanel({
                             <span className="text-xs font-semibold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-4 py-1.5 rounded-full inline-block">
                                 Scale 4.0 GPA
                             </span>
+                            {sProfile && (
+                                <button
+                                    onClick={() => window.open(`/api/students/${sProfile.id}/report-card`, '_blank')}
+                                    className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-500 hover:to-sky-500 text-white rounded-lg text-xs font-semibold transition-all duration-300 transform hover:scale-[1.02] shadow-md hover:shadow-indigo-500/25"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Download Report Card (PDF)
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

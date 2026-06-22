@@ -49,6 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/attendance', [AcademicController::class, 'submitAttendance']);
     Route::get('/api/grades/{studentId?}', [AcademicController::class, 'getGrades']);
     Route::post('/api/grades', [AcademicController::class, 'storeGrade']);
+    Route::get('/api/students/{id}/report-card', [AcademicController::class, 'downloadReportCard']);
 
     // 3. Finance & Invoicing
     Route::get('/api/finance', [FinanceController::class, 'getFinancialDashboard']);

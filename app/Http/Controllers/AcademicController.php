@@ -12,6 +12,7 @@ use App\Models\Student;
 use Illuminate\Support\Facades\Log;
 use App\Notifications\AbsenceNotification;
 use App\Models\AuditLog;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AcademicController extends Controller
 {
@@ -252,5 +253,133 @@ class AcademicController extends Controller
             'message' => 'Grade entered in gradebook successfully.',
             'grade' => $grade
         ]);
+    }
+
+    /**
+     * Generate and download a PDF report card for a student.
+     */
+    public function downloadReportCard(Request $request, $studentId)
+    {
+        $student = Student::with(['user', 'batches.course'])->findOrFail($studentId);
+        
+        $grades = Grade::where('student_id', $studentId)->get();
+        
+        $getLetterGrade = function ($percentage) {
+            if ($percentage >= 90) return 'A+';
+            if ($percentage >= 80) return 'A';
+            if ($percentage >= 70) return 'B';
+            if ($percentage >= 60) return 'C';
+            return 'F';
+        };
+
+        $getGradePoint = function ($letter) {
+            switch ($letter) {
+                case 'A+': return 4.0;
+                case 'A': return 3.7;
+                case 'B': return 3.0;
+                case 'C': return 2.0;
+                default: return 0.0;
+            }
+        };
+
+        $subjectGrades = [];
+        $totalWeight = 0;
+        $totalWeightedScore = 0;
+
+        foreach ($grades as $g) {
+            $ratio = $g->marks_obtained / $g->max_marks;
+            $percent = $ratio * 100;
+            $letter = $getLetterGrade($percent);
+            $gp = $getGradePoint($letter);
+            $weight = floatval($g->weight);
+
+            $subjectGrades[] = [
+                'subject_name' => $g->subject_name,
+                'assessment_name' => $g->assessment_name,
+                'weight' => $weight,
+                'marks_obtained' => floatval($g->marks_obtained),
+                'max_marks' => floatval($g->max_marks),
+                'percentage' => round($percent, 1),
+                'letter_grade' => $letter,
+                'grade_point' => $gp,
+            ];
+
+            $totalWeightedScore += $percent * $weight;
+            $totalWeight += $weight;
+        }
+
+        $overallAverage = $totalWeight > 0 ? round($totalWeightedScore / $totalWeight, 1) : 0;
+        
+        $cumulativeGPA = 0;
+        $totalGPAs = 0;
+        foreach ($subjectGrades as $sg) {
+            $cumulativeGPA += $sg['grade_point'] * $sg['weight'];
+            $totalGPAs += $sg['weight'];
+        }
+        $finalGPA = $totalGPAs > 0 ? round($cumulativeGPA / $totalGPAs, 2) : 0.0;
+
+        $allStudents = Student::where('status', 'enrolled')->get();
+        $rankings = [];
+
+        foreach ($allStudents as $s) {
+            $studentGrades = Grade::where('student_id', $s->id)->get();
+            $sCumulative = 0;
+            $sWeight = 0;
+            
+            foreach ($studentGrades as $g) {
+                $percent = ($g->marks_obtained / $g->max_marks) * 100;
+                $letter = $getLetterGrade($percent);
+                $gp = $getGradePoint($letter);
+                $weight = floatval($g->weight);
+                
+                $sCumulative += $gp * $weight;
+                $sWeight += $weight;
+            }
+            
+            $sGPA = $sWeight > 0 ? $sCumulative / $sWeight : 0.0;
+            $rankings[$s->id] = $sGPA;
+        }
+
+        arsort($rankings);
+        
+        $rankPosition = 1;
+        foreach ($rankings as $sid => $gpa) {
+            if (intval($sid) === intval($studentId)) {
+                break;
+            }
+            $rankPosition++;
+        }
+        $totalCohort = count($allStudents);
+
+        try {
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'downloaded_report_card',
+                'auditable_type' => Student::class,
+                'auditable_id' => $student->id,
+                'old_values' => null,
+                'new_values' => [
+                    'student_name' => $student->user->name,
+                    'class_rank' => "{$rankPosition} of {$totalCohort}",
+                    'gpa' => number_format($finalGPA, 2)
+                ],
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to log report card download audit: " . $e->getMessage());
+        }
+
+        $data = [
+            'student' => $student,
+            'subjectGrades' => $subjectGrades,
+            'overallAverage' => $overallAverage,
+            'finalGPA' => number_format($finalGPA, 2),
+            'classRank' => "{$rankPosition} of {$totalCohort}",
+            'dateOfIssue' => date('F d, Y'),
+        ];
+
+        $pdf = Pdf::loadView('pdf.report_card', $data);
+        
+        return $pdf->download("Report_Card_{$student->student_id}.pdf");
     }
 }
