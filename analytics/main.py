@@ -9,7 +9,7 @@ from sklearn.linear_model import LinearRegression
 from datetime import datetime
 
 # Import ML predict utility
-from model import get_risk_prediction
+from model import get_risk_prediction, train_and_save_model
 
 app = FastAPI(
     title="IMS Analytics & AI Engine",
@@ -202,3 +202,15 @@ def forecast_enrollment():
         raise HTTPException(status_code=500, detail=f"Forecasting error: {str(e)}")
     finally:
         db.close()
+
+@app.post("/train")
+def train_model():
+    try:
+        samples_trained = train_and_save_model()
+        return {
+            "success": True,
+            "message": "AI Risk Warning model retrained successfully.",
+            "samples_trained": samples_trained
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Model retraining failed: {str(e)}")

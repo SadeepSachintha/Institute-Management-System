@@ -7,6 +7,8 @@ use App\Models\Faculty;
 use App\Models\LeaveRequest;
 use App\Models\Timetable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\LeaveStatusMail;
 
 class FacultyController extends Controller
 {
@@ -83,15 +85,28 @@ class FacultyController extends Controller
             'status' => 'required|in:approved,rejected'
         ]);
 
-        $leave = LeaveRequest::findOrFail($id);
+        $leave = LeaveRequest::with('faculty.user')->findOrFail($id);
         $leave->update([
             'status' => $request->status
         ]);
 
+        // Dispatch status update email
+        try {
+            Mail::to($leave->faculty->user->email)->send(new LeaveStatusMail(
+                $leave->faculty->user->name,
+                $leave->start_date,
+                $leave->end_date,
+                $leave->status,
+                $leave->reason
+            ));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to send leave status email to {$leave->faculty->user->email}: " . $e->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => "Leave request has been " . strtoupper($request->status) . ".",
-            'leave' => $leave->load('faculty.user')
+            'leave' => $leave
         ]);
     }
 }

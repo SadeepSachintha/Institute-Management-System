@@ -38,6 +38,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/students', [AdmissionController::class, 'index']);
     Route::post('/api/students', [AdmissionController::class, 'store']);
     Route::post('/api/students/{id}/document', [AdmissionController::class, 'uploadDocument']);
+    Route::post('/api/students/{id}/verify-document', [AdmissionController::class, 'verifyDocument']);
 
     // 2. Academics & Course Scheduling
     Route::get('/api/academic-structure', [AcademicController::class, 'getAcademicStructure']);
@@ -61,6 +62,7 @@ Route::middleware('auth')->group(function () {
     // 5. Predictive Analytics & AI
     Route::get('/api/analytics/student-risk/{studentId}', [AnalyticsController::class, 'getStudentRisk']);
     Route::get('/api/analytics/enrollment-forecast', [AnalyticsController::class, 'getEnrollmentForecast']);
+    Route::post('/api/analytics/train', [AnalyticsController::class, 'retrainModel']);
 });
 
 require __DIR__.'/auth.php';

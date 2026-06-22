@@ -92,7 +92,8 @@ class AdmissionController extends Controller
         if ($request->hasFile('document')) {
             $path = $request->file('document')->store('documents', 'public');
             $student->update([
-                'document_path' => $path
+                'document_path' => $path,
+                'document_status' => 'pending'
             ]);
 
             return response()->json([
@@ -103,5 +104,32 @@ class AdmissionController extends Controller
         }
 
         return response()->json(['error' => 'No file uploaded'], 400);
+    }
+
+    /**
+     * Verify or reject student documents.
+     */
+    public function verifyDocument(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|string|in:approved,rejected'
+        ]);
+
+        $student = Student::findOrFail($id);
+        $updateData = [
+            'document_status' => $request->status
+        ];
+        
+        if ($request->status === 'approved') {
+            $updateData['status'] = 'enrolled';
+        }
+        
+        $student->update($updateData);
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Document status updated to ' . $request->status . ' successfully.',
+            'student' => $student->load('user')
+        ]);
     }
 }

@@ -56,6 +56,7 @@ export default function Dashboard() {
     // AI Prediction Cache
     const [aiRiskCache, setAiRiskCache] = useState({}); // student_id -> prediction object
     const [predictingId, setPredictingId] = useState(null);
+    const [retraining, setRetraining] = useState(false);
 
     // Modal / Workflow state
     const [workflowReceipt, setWorkflowReceipt] = useState(null);
@@ -187,6 +188,18 @@ export default function Dashboard() {
         }
     };
 
+    const handleVerifyDocument = async (studentId, status) => {
+        try {
+            const res = await axios.post(`/api/students/${studentId}/verify-document`, { status });
+            if (res.data.success) {
+                showMessage(res.data.message, 'success');
+                loadTabData();
+            }
+        } catch (err) {
+            showMessage(err.response?.data?.message || 'Failed to verify document.', 'error');
+        }
+    };
+
     const handleScheduleClass = async (e) => {
         e.preventDefault();
         try {
@@ -313,6 +326,22 @@ export default function Dashboard() {
             showMessage(err.response?.data?.message || 'FastAPI predictive analytics service unavailable.', 'error');
         } finally {
             setPredictingId(null);
+        }
+    };
+
+    const handleRetrainModel = async () => {
+        setRetraining(true);
+        try {
+            const res = await axios.post('/api/analytics/train');
+            if (res.data.success) {
+                showMessage(`${res.data.message} Trained on ${res.data.samples_trained} records.`, 'success');
+                setAiRiskCache({});
+                loadTabData();
+            }
+        } catch (err) {
+            showMessage(err.response?.data?.message || 'FastAPI training service offline or failed.', 'error');
+        } finally {
+            setRetraining(false);
         }
     };
 
@@ -465,6 +494,7 @@ export default function Dashboard() {
                                     setUploadStudentId={setUploadStudentId}
                                     setUploadFile={setUploadFile}
                                     handleUploadDoc={handleUploadDoc}
+                                    handleVerifyDocument={handleVerifyDocument}
                                     loading={loading}
                                 />
                             )}
@@ -499,6 +529,8 @@ export default function Dashboard() {
                                     predictingId={predictingId}
                                     assessStudentRisk={assessStudentRisk}
                                     forecastData={forecastData}
+                                    retraining={retraining}
+                                    handleRetrainModel={handleRetrainModel}
                                 />
                             )}
 

@@ -10,6 +10,8 @@ use App\Models\Attendance;
 use App\Models\Grade;
 use App\Models\Student;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\AbsenceNotificationMail;
 
 class AcademicController extends Controller
 {
@@ -92,6 +94,25 @@ class AcademicController extends Controller
             ], 422);
         }
 
+        // Conflict check 3: Same student batch, same day, overlapping time slot
+        $batchId = $request->batch_id;
+        $batchConflict = Timetable::where('day_of_week', $day)
+            ->where('batch_id', $batchId)
+            ->where(function ($query) use ($startTime, $endTime) {
+                $query->where(function ($q) use ($startTime, $endTime) {
+                    $q->where('start_time', '<', $endTime)
+                      ->where('end_time', '>', $startTime);
+                });
+            })
+            ->first();
+
+        if ($batchConflict) {
+            return response()->json([
+                'error' => true,
+                'message' => "Scheduling conflict: Batch cohort is already scheduled for '{$batchConflict->subject_name}' in room {$batchConflict->room_number} during this time ({$batchConflict->start_time} - {$batchConflict->end_time})."
+            ], 422);
+        }
+
         $slot = Timetable::create($request->all());
 
         return response()->json([
@@ -132,6 +153,10 @@ class AcademicController extends Controller
         $timetableId = $request->timetable_id;
         $results = [];
 
+        // Fetch timetable subject
+        $timetableSlot = Timetable::find($timetableId);
+        $subjectName = $timetableSlot ? $timetableSlot->subject_name : 'Class Slot';
+
         foreach ($request->attendance_data as $log) {
             $studentId = $log['student_id'];
             $status = $log['status'];
@@ -151,6 +176,18 @@ class AcademicController extends Controller
                 
                 foreach ($student->parents as $p) {
                     $parentEmail = $p->user->email;
+                    
+                    try {
+                        Mail::to($parentEmail)->send(new AbsenceNotificationMail(
+                            $studentName,
+                            $student->student_id,
+                            $date,
+                            $subjectName
+                        ));
+                    } catch (\Exception $e) {
+                        Log::error("Failed to send absence email to {$parentEmail}: " . $e->getMessage());
+                    }
+
                     Log::channel('single')->warning(
                         "PARENT ALERT SENT to {$parentEmail}: Your child {$studentName} was marked ABSENT for timetable slot #{$timetableId} on {$date}."
                     );

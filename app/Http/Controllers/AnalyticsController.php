@@ -55,4 +55,28 @@ class AnalyticsController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Trigger retraining of the AI Risk model.
+     */
+    public function retrainModel()
+    {
+        try {
+            $response = Http::timeout(30)->post("http://127.0.0.1:8080/train");
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json([
+                'error' => true,
+                'message' => 'FastAPI service returned an error status: ' . $response->status()
+            ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => 'Unable to connect to FastAPI microservice on port 8080. ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

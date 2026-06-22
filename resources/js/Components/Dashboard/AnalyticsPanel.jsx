@@ -6,7 +6,9 @@ export default function AnalyticsPanel({
     aiRiskCache,
     predictingId,
     assessStudentRisk,
-    forecastData
+    forecastData,
+    retraining,
+    handleRetrainModel
 }) {
     // Process forecast data for charting
     const chartData = forecastData
@@ -37,10 +39,36 @@ export default function AnalyticsPanel({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Predictor Dashboard */}
                 <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-2xl p-6 shadow-lg">
-                    <h3 className="text-lg font-bold text-white mb-2">Early Warning System</h3>
-                    <p className="text-xs text-slate-500 mb-6">
-                        AI evaluation of student drop-out risks based on attendance and grading dips
-                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-white mb-1">Early Warning System</h3>
+                            <p className="text-xs text-slate-500">
+                                AI evaluation of student drop-out risks based on attendance and grading dips
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleRetrainModel}
+                            disabled={retraining}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:opacity-60 text-white rounded-xl text-xs font-semibold transition shadow-md shadow-indigo-950/30 flex items-center gap-2 self-start sm:self-center"
+                        >
+                            {retraining ? (
+                                <>
+                                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    Retraining...
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3 3L22 4" />
+                                    </svg>
+                                    Retrain AI Model
+                                </>
+                            )}
+                        </button>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm text-slate-400">
                             <thead className="bg-slate-950 text-slate-300 border-b border-slate-800">

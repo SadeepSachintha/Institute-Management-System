@@ -10,8 +10,11 @@ export default function SisPanel({
     setUploadStudentId,
     setUploadFile,
     handleUploadDoc,
+    handleVerifyDocument,
     loading
 }) {
+    const pendingStudents = students.filter(s => s.document_path && s.document_status === 'pending');
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
@@ -45,15 +48,30 @@ export default function SisPanel({
                                             </span>
                                         </td>
                                         <td className="py-3 px-4">
-                                            {s.document_path ? (
+                                            {!s.document_path ? (
+                                                <span className="text-xs text-rose-400">Missing</span>
+                                            ) : s.document_status === 'approved' ? (
                                                 <span className="text-xs text-emerald-400 flex items-center gap-1">
                                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                     </svg>
                                                     Verified
                                                 </span>
+                                            ) : s.document_status === 'rejected' ? (
+                                                <span className="text-xs text-rose-400 flex items-center gap-1">
+                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                    Rejected
+                                                </span>
                                             ) : (
-                                                <span className="text-xs text-rose-400">Missing</span>
+                                                <span className="text-xs text-amber-400 flex items-center gap-1">
+                                                    <svg className="w-3.5 h-3.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+                                                    </svg>
+                                                    Pending
+                                                </span>
                                             )}
                                         </td>
                                     </tr>
@@ -66,6 +84,60 @@ export default function SisPanel({
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                {/* Document Verification Queue */}
+                <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-white">Document Verification Queue</h3>
+                        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-0.5 rounded-full text-xs font-semibold">
+                            {pendingStudents.length} Pending
+                        </span>
+                    </div>
+                    {pendingStudents.length === 0 ? (
+                        <div className="text-center py-8 text-slate-500 border border-dashed border-slate-800 rounded-lg">
+                            No pending documents require review.
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {pendingStudents.map((s) => (
+                                <div key={s.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-950/60 border border-slate-800 rounded-xl hover:border-slate-700/60 transition gap-4">
+                                    <div>
+                                        <div className="text-sm font-semibold text-white">{s.user?.name}</div>
+                                        <div className="text-xs text-slate-400 mt-0.5">
+                                            ID: <span className="font-mono text-indigo-400">{s.student_id}</span> | Email: {s.user?.email}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <a
+                                            href={`/storage/${s.document_path}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition border border-slate-700/50 flex items-center gap-1.5"
+                                        >
+                                            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            View
+                                        </a>
+                                        <button
+                                            onClick={() => handleVerifyDocument(s.id, 'approved')}
+                                            className="px-3 py-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition shadow-md shadow-emerald-950/20"
+                                        >
+                                            Approve
+                                        </button>
+                                        <button
+                                            onClick={() => handleVerifyDocument(s.id, 'rejected')}
+                                            className="px-3 py-1.5 bg-rose-600/90 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold transition shadow-md shadow-rose-950/20"
+                                        >
+                                            Reject
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
