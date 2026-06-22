@@ -18,16 +18,18 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 
 ### 3. Financial & Fee Management
 * **Automated Billing:** Dynamic tuition, library, and transportation fee invoicing.
+
 * **Tuition Sandbox Portal:** A payment simulation sandbox for students/parents to process outstanding dues and get instant digital receipts.
-* **Revenue Dashboard:** Visual charts tracking revenue collections, paid invoices, and outstanding balances.
+* **Revenue Dashboard:** Premium HSL-gradient interactive Area charts tracking collections, paid invoices, and outstanding balances.
 
 ### 4. Faculty & HR Management
-* **Leave Requests:** Approval workflow for leaves with visual workload mapping to prevent scheduling conflicts.
+* **Leave Requests:** Approval workflow for leaves with workloads mapping.
 * **Faculty Profiles:** Qualifications tracker, department assignments, and teaching hour capacities.
 
 ### 5. AI Analytics & Early Warning System
 * **Early Warning Model:** A Python-based `LogisticRegression` model that flags students at risk based on recent attendance rates and grading trends.
-* **Analytics Insights:** Visual graphs showing forecasted enrollments and student risk indexes.
+* **Analytics Insights:** Interactive bar graphs showing linear regression forecasted enrollments and student risk indexes.
+* **Global Toast Center:** Real-time stackable visual notifications alerting administrators and faculty of onboarding workflows, attendance logs, and invoice payments.
 
 ---
 
@@ -36,7 +38,7 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 | Component | Technology | Role |
 | --- | --- | --- |
 | **Core Backend** | Laravel 12.x | Secure MVC framework, routing, migrations, seeders, and Eloquent ORM. |
-| **Frontend** | React SPA (Inertia.js) | Reactive frontend views without the API-token authentication overhead. |
+| **Frontend** | React SPA (Inertia.js) + Recharts | Reactive views with role-based panels and interactive data visualizations. |
 | **CSS Styling** | Tailwind CSS / HSL CSS | Unified dark-theme glassmorphism layout, custom SVG academic emblem, custom form widgets, and glow indicators. |
 | **MLOps & Analytics** | Python 3.14 + FastAPI | Machine learning pipeline, early warning inference API. |
 | **Database** | MariaDB / MySQL | Relational data store, configured on custom port `3307` for environment safety. |
@@ -57,9 +59,13 @@ Institute Management System/
 ├── config/                 # Laravel configs
 ├── database/               # Migrations & database seeders
 ├── public/                 # Built assets
-├── resources/              # React SPA Pages (Inertia.js)
+├── resources/              # React SPA Pages, Components, and Layouts
 │   ├── js/
-│   │   ├── Pages/          # Client View screens (Dashboard, Academic, Finance, etc.)
+│   │   ├── Components/     # Shared components and role-based dashboard views
+│   │   │   └── Dashboard/  # SisPanel, FinancePanel, HrPanel, AnalyticsPanel, etc.
+│   │   ├── Contexts/       # React Contexts (ToastContext for global alerts)
+│   │   ├── Layouts/        # AuthenticatedLayout and GuestLayout
+│   │   ├── Pages/          # Client view screens (Dashboard.jsx, Welcome.jsx)
 │   │   └── app.jsx
 │   └── css/
 ├── routes/                 # Web routes (Blade / Inertia) and API endpoints
