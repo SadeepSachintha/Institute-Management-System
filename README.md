@@ -165,7 +165,7 @@ For development safety and to prevent conflicting with existing default database
    ```
 2. Run the FastAPI development server:
    ```powershell
-   .\analytics\.venv\Scripts\python.exe -m uvicorn analytics.main:app --host 127.0.0.1 --port 8080 --reload
+   .\analytics\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8080 --reload --app-dir .\analytics
    ```
 
 ---
@@ -181,3 +181,7 @@ For development safety and to prevent conflicting with existing default database
    Log in as Dr. Alan Turing, navigate to the gradebook or attendance logger, modify John Doe's attendance to "absent" and input failing marks, then check the Analytics Dashboard to see the risk probability index update dynamically via the ML microservice.
 3. **Workflow Automation Test:** 
    Log in as Student Alice Cooper, who has status "applicant". Go to the Payment Sandbox, complete the fee payment of \$300. Verify the system automatically generates student ID `STU-2026-0003` and shifts her status to "enrolled".
+
+---
+
+Developed and maintained by [SS Labz](https://ss-labz.pages.dev).
