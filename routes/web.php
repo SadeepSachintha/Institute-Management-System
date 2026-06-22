@@ -6,6 +6,7 @@ use App\Http\Controllers\AcademicController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FacultyController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\AuditController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -63,6 +64,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/analytics/student-risk/{studentId}', [AnalyticsController::class, 'getStudentRisk']);
     Route::get('/api/analytics/enrollment-forecast', [AnalyticsController::class, 'getEnrollmentForecast']);
     Route::post('/api/analytics/train', [AnalyticsController::class, 'retrainModel']);
+
+    // 6. System Audit Logs
+    Route::get('/api/audit-logs', [AuditController::class, 'index']);
 });
 
 require __DIR__.'/auth.php';

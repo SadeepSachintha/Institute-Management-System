@@ -37,6 +37,7 @@ export default function Dashboard() {
     const [leaves, setLeaves] = useState([]);
     const [finance, setFinance] = useState(null);
     const [forecastData, setForecastData] = useState(null);
+    const [auditLogs, setAuditLogs] = useState([]);
 
     // Form inputs states
     const [studentForm, setStudentForm] = useState({ name: '', email: '', status: 'applicant', academic_history: '', demographic_data: '', fee_id: '' });
@@ -92,6 +93,11 @@ export default function Dashboard() {
                 const struct = await axios.get('/api/academic-structure');
                 setCourses(struct.data.courses);
                 setBatches(struct.data.batches);
+
+                if (activeTab === 'sis') {
+                    const audits = await axios.get('/api/audit-logs');
+                    setAuditLogs(audits.data);
+                }
             }
             
             if (activeTab === 'schedule' || activeTab === 'timetabling') {
@@ -495,6 +501,7 @@ export default function Dashboard() {
                                     setUploadFile={setUploadFile}
                                     handleUploadDoc={handleUploadDoc}
                                     handleVerifyDocument={handleVerifyDocument}
+                                    auditLogs={auditLogs}
                                     loading={loading}
                                 />
                             )}

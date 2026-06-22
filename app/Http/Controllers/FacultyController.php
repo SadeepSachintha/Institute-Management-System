@@ -7,8 +7,8 @@ use App\Models\Faculty;
 use App\Models\LeaveRequest;
 use App\Models\Timetable;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\LeaveStatusMail;
+use App\Notifications\LeaveStatusNotification;
+use App\Models\AuditLog;
 
 class FacultyController extends Controller
 {
@@ -86,13 +86,15 @@ class FacultyController extends Controller
         ]);
 
         $leave = LeaveRequest::with('faculty.user')->findOrFail($id);
+        $oldStatus = $leave->status;
+
         $leave->update([
             'status' => $request->status
         ]);
 
-        // Dispatch status update email
+        // Dispatch status update email and database notification
         try {
-            Mail::to($leave->faculty->user->email)->send(new LeaveStatusMail(
+            $leave->faculty->user->notify(new LeaveStatusNotification(
                 $leave->faculty->user->name,
                 $leave->start_date,
                 $leave->end_date,
@@ -100,7 +102,22 @@ class FacultyController extends Controller
                 $leave->reason
             ));
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Failed to send leave status email to {$leave->faculty->user->email}: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error("Failed to notify leave request: " . $e->getMessage());
+        }
+
+        // Audit Logging
+        try {
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'leave_status_changed',
+                'auditable_type' => LeaveRequest::class,
+                'auditable_id' => $leave->id,
+                'old_values' => ['status' => $oldStatus],
+                'new_values' => ['status' => $leave->status],
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to log leave status audit: " . $e->getMessage());
         }
 
         return response()->json([

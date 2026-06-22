@@ -86,6 +86,20 @@ class FinanceController extends Controller
                 'payment_date' => Carbon::now(),
             ]);
 
+            try {
+                \App\Models\AuditLog::create([
+                    'user_id' => auth()->id(),
+                    'action' => 'processed_payment',
+                    'auditable_type' => Payment::class,
+                    'auditable_id' => $payment->id,
+                    'old_values' => null,
+                    'new_values' => $payment->toArray(),
+                    'ip_address' => $request->ip(),
+                ]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Failed to log payment audit log: " . $e->getMessage());
+            }
+
             // Update invoice status
             $newPaidTotal = $alreadyPaid + $amountToPay;
             $netInvoiceAmount = $invoice->amount - $invoice->discount;

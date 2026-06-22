@@ -10,8 +10,8 @@ use App\Models\Attendance;
 use App\Models\Grade;
 use App\Models\Student;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\AbsenceNotificationMail;
+use App\Notifications\AbsenceNotification;
+use App\Models\AuditLog;
 
 class AcademicController extends Controller
 {
@@ -178,14 +178,14 @@ class AcademicController extends Controller
                     $parentEmail = $p->user->email;
                     
                     try {
-                        Mail::to($parentEmail)->send(new AbsenceNotificationMail(
+                        $p->user->notify(new AbsenceNotification(
                             $studentName,
                             $student->student_id,
                             $date,
                             $subjectName
                         ));
                     } catch (\Exception $e) {
-                        Log::error("Failed to send absence email to {$parentEmail}: " . $e->getMessage());
+                        Log::error("Failed to send absence notification to {$parentEmail}: " . $e->getMessage());
                     }
 
                     Log::channel('single')->warning(
@@ -232,6 +232,20 @@ class AcademicController extends Controller
         ]);
 
         $grade = Grade::create($request->all());
+
+        try {
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'entered_grade',
+                'auditable_type' => Grade::class,
+                'auditable_id' => $grade->id,
+                'old_values' => null,
+                'new_values' => $grade->toArray(),
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Failed to log grade entry audit log: " . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

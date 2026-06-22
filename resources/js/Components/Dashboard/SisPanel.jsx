@@ -11,6 +11,7 @@ export default function SisPanel({
     setUploadFile,
     handleUploadDoc,
     handleVerifyDocument,
+    auditLogs = [],
     loading
 }) {
     const pendingStudents = students.filter(s => s.document_path && s.document_status === 'pending');
@@ -138,6 +139,81 @@ export default function SisPanel({
                             ))}
                         </div>
                     )}
+                </div>
+
+                {/* Institutional Audit Trail */}
+                <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-xl p-6 mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Institutional Audit Trail
+                        </h3>
+                        <span className="text-2xs font-mono text-slate-500 uppercase tracking-widest">
+                            Secure Log
+                        </span>
+                    </div>
+                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto pr-1">
+                        <table className="w-full text-left text-xs text-slate-400">
+                            <thead className="bg-slate-950 text-slate-300 border-b border-slate-800 sticky top-0 z-10">
+                                <tr>
+                                    <th className="py-2.5 px-3 font-semibold">Actor</th>
+                                    <th className="py-2.5 px-3 font-semibold">Action</th>
+                                    <th className="py-2.5 px-3 font-semibold">Target Entity</th>
+                                    <th className="py-2.5 px-3 font-semibold">IP Address</th>
+                                    <th className="py-2.5 px-3 font-semibold text-right">Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/40">
+                                {auditLogs.map((log) => (
+                                    <tr key={log.id} className="hover:bg-slate-800/20 transition">
+                                        <td className="py-2.5 px-3 font-medium text-white">
+                                            {log.user?.name || 'System / Batch'}
+                                            <span className="block text-3xs text-slate-500 font-mono mt-0.5">
+                                                {log.user?.email || 'automated@ims.core'}
+                                            </span>
+                                        </td>
+                                        <td className="py-2.5 px-3 font-mono text-2xs">
+                                            <span className={`inline-block px-1.5 py-0.5 rounded text-3xs uppercase font-semibold ${
+                                                log.action === 'entered_grade' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                                                log.action === 'leave_status_changed' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                            }`}>
+                                                {log.action.replace('_', ' ')}
+                                            </span>
+                                        </td>
+                                        <td className="py-2.5 px-3 text-2xs text-slate-300">
+                                            <span className="font-mono text-3xs text-slate-500 block">
+                                                {log.auditable_type?.split('\\').pop() || 'N/A'} (ID: {log.auditable_id})
+                                            </span>
+                                            {log.new_values && (
+                                                <span className="block text-3xs text-slate-400 italic mt-0.5">
+                                                    {log.action === 'leave_status_changed' 
+                                                        ? `Status: ${log.old_values?.status} → ${log.new_values?.status}`
+                                                        : log.action === 'entered_grade'
+                                                            ? `Assessment: ${log.new_values?.assessment_name} (${log.new_values?.marks_obtained}/${log.new_values?.max_marks} marks)`
+                                                            : `Transaction logged`
+                                                    }
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="py-2.5 px-3 font-mono text-3xs text-slate-500">{log.ip_address || '127.0.0.1'}</td>
+                                        <td className="py-2.5 px-3 text-right text-slate-500 text-3xs font-mono">
+                                            {new Date(log.created_at).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {auditLogs.length === 0 && (
+                                    <tr>
+                                        <td colSpan="5" className="py-8 text-center text-slate-500 italic">
+                                            No administrative actions have been audited yet.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 

@@ -8,17 +8,17 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 
 ### 1. Student Information System (SIS) & Admissions
 * **Onboarding State Machine:** Automates transitions from Inquiry $\rightarrow$ Applicant $\rightarrow$ Enrolled $\rightarrow$ Alumni.
-* **Centralized Profiles:** A unified source of truth for academic histories, medical records, and demographic data.
+* **Document Verification Queue:** Administrative queue showing applicant PDFs/images, verifying status, and promoting profiles to enrolled.
+* **Institutional Audit Trail:** Logs administrative events (entered grades, leave updates, tuition payments) with IP addresses and before/after values.
 * **Automatic ID Generation:** Generates unique student IDs (`STU-YYYY-XXXX`) the moment enrollment registration is completed.
 
 ### 2. Academic & Course Management
-* **Timetable Scheduler:** Automated course scheduling with built-in validator checking for faculty and room booking conflicts.
-* **Attendance Log & Absence Alerts:** Real-time logging via faculty portal with automated alerts triggered for parents on absences.
+* **Collision Timetable Scheduler:** Course scheduling with double-booking checks on faculty, room, and student batch cohorts.
+* **Database & Mail Alerts:** Absences and leave status approvals trigger database logs and mock emails via Laravel's notification channel framework.
 * **Gradebook:** Configurable assessment parameters, weighting calculations, and cumulative GPA logs.
 
 ### 3. Financial & Fee Management
 * **Automated Billing:** Dynamic tuition, library, and transportation fee invoicing.
-
 * **Tuition Sandbox Portal:** A payment simulation sandbox for students/parents to process outstanding dues and get instant digital receipts.
 * **Revenue Dashboard:** Premium HSL-gradient interactive Area charts tracking collections, paid invoices, and outstanding balances.
 
@@ -27,8 +27,8 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 * **Faculty Profiles:** Qualifications tracker, department assignments, and teaching hour capacities.
 
 ### 5. AI Analytics & Early Warning System
-* **Early Warning Model:** A Python-based `LogisticRegression` model that flags students at risk based on recent attendance rates and grading trends.
-* **Analytics Insights:** Interactive bar graphs showing linear regression forecasted enrollments and student risk indexes.
+* **Early Warning Explainability:** scikit-learn `LogisticRegression` model flags dropout risks and returns SHAP-like feature contributions (attendance, grades, lateness, absences) mapped onto graphical progress meters.
+* **Seasonality-Aware Forecasts:** Predicts enrollments using Classical Additive Time-Series Decomposition to model term-based peaks.
 * **Global Toast Center:** Real-time stackable visual notifications alerting administrators and faculty of onboarding workflows, attendance logs, and invoice payments.
 
 ---
@@ -37,10 +37,10 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 
 | Component | Technology | Role |
 | --- | --- | --- |
-| **Core Backend** | Laravel 12.x | Secure MVC framework, routing, migrations, seeders, and Eloquent ORM. |
-| **Frontend** | React SPA (Inertia.js) + Recharts | Reactive views with role-based panels and interactive data visualizations. |
+| **Core Backend** | Laravel 12.x | Secure MVC framework, notifications channels, polymorphic audit logging, and Eloquent ORM. |
+| **Frontend** | React SPA (Inertia.js) + Recharts | Reactive views with role-based panels, expandable risk explanator rows, and interactive data visualizations. |
 | **CSS Styling** | Tailwind CSS / HSL CSS | Unified dark-theme glassmorphism layout, custom SVG academic emblem, custom form widgets, and glow indicators. |
-| **MLOps & Analytics** | Python 3.14 + FastAPI | Machine learning pipeline, early warning inference API. |
+| **MLOps & Analytics** | Python 3.14 + FastAPI + SQLAlchemy | Machine learning pipeline, classical additive seasonal forecaster, SHAP explainer engine, and SQLAlchemy `QueuePool` database connection pooling. |
 | **Database** | MariaDB / MySQL | Relational data store, configured on custom port `3307` for environment safety. |
 
 ---
