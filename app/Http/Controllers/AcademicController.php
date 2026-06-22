@@ -264,11 +264,16 @@ class AcademicController extends Controller
         
         $grades = Grade::where('student_id', $studentId)->get();
         
-        $getLetterGrade = function ($percentage) {
-            if ($percentage >= 90) return 'A+';
-            if ($percentage >= 80) return 'A';
-            if ($percentage >= 70) return 'B';
-            if ($percentage >= 60) return 'C';
+        $thresholdAPlus = floatval(\App\Models\Setting::get('grade_threshold_a_plus', 90));
+        $thresholdA = floatval(\App\Models\Setting::get('grade_threshold_a', 80));
+        $thresholdB = floatval(\App\Models\Setting::get('grade_threshold_b', 70));
+        $thresholdC = floatval(\App\Models\Setting::get('grade_threshold_c', 60));
+
+        $getLetterGrade = function ($percentage) use ($thresholdAPlus, $thresholdA, $thresholdB, $thresholdC) {
+            if ($percentage >= $thresholdAPlus) return 'A+';
+            if ($percentage >= $thresholdA) return 'A';
+            if ($percentage >= $thresholdB) return 'B';
+            if ($percentage >= $thresholdC) return 'C';
             return 'F';
         };
 
@@ -382,4 +387,263 @@ class AcademicController extends Controller
         
         return $pdf->download("Report_Card_{$student->student_id}.pdf");
     }
+
+    /**
+     * Bulk import grades from CSV.
+     */
+    public function bulkImportGrades(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt'
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->getRealPath();
+        $handle = fopen($path, 'r');
+        if (!$handle) {
+            return response()->json(['success' => false, 'message' => 'Unable to open file.'], 400);
+        }
+
+        // Parse header row
+        $headers = fgetcsv($handle);
+        if (!$headers) {
+            fclose($handle);
+            return response()->json(['success' => false, 'message' => 'Empty CSV file.'], 400);
+        }
+
+        // Clean/normalize headers to find indexes
+        $headerMapping = [];
+        foreach ($headers as $index => $header) {
+            $cleaned = strtolower(trim(str_replace(['_', ' '], '', $header)));
+            $headerMapping[$cleaned] = $index;
+        }
+
+        $studentIdIndex = null;
+        $subjectIndex = null;
+        $assessmentIndex = null;
+        $marksIndex = null;
+        $maxMarksIndex = null;
+        $weightIndex = null;
+
+        foreach ($headerMapping as $cleaned => $index) {
+            if (in_array($cleaned, ['studentid', 'student', 'stu', 'id'])) {
+                $studentIdIndex = $index;
+            } elseif (in_array($cleaned, ['subjectname', 'subject', 'course'])) {
+                $subjectIndex = $index;
+            } elseif (in_array($cleaned, ['assessmentname', 'assessment', 'label', 'exam', 'test'])) {
+                $assessmentIndex = $index;
+            } elseif (in_array($cleaned, ['marksobtained', 'marks', 'score', 'obtained'])) {
+                $marksIndex = $index;
+            } elseif (in_array($cleaned, ['maxmarks', 'maximummarks', 'max', 'total'])) {
+                $maxMarksIndex = $index;
+            } elseif (in_array($cleaned, ['weight', 'ratio', 'percentage', 'weightratio'])) {
+                $weightIndex = $index;
+            }
+        }
+
+        // If any required column index is missing, report error
+        if ($studentIdIndex === null || $subjectIndex === null || $assessmentIndex === null || $marksIndex === null || $maxMarksIndex === null || $weightIndex === null) {
+            fclose($handle);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid CSV headers. The CSV must contain columns for: Student ID, Subject Name, Assessment Name, Marks Obtained, Max Marks, and Weight.'
+            ], 422);
+        }
+
+        $rowNum = 1; // Header is row 1
+        $validationErrors = [];
+        $rowsToInsert = [];
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+
+            // Skip empty rows
+            if (count($row) === 1 && empty($row[0])) {
+                continue;
+            }
+
+            // Read cell values
+            $rawStudentId = isset($row[$studentIdIndex]) ? trim($row[$studentIdIndex]) : '';
+            $rawSubject = isset($row[$subjectIndex]) ? trim($row[$subjectIndex]) : '';
+            $rawAssessment = isset($row[$assessmentIndex]) ? trim($row[$assessmentIndex]) : '';
+            $rawMarks = isset($row[$marksIndex]) ? trim($row[$marksIndex]) : '';
+            $rawMaxMarks = isset($row[$maxMarksIndex]) ? trim($row[$maxMarksIndex]) : '';
+            $rawWeight = isset($row[$weightIndex]) ? trim($row[$weightIndex]) : '';
+
+            // Validate Student
+            if (empty($rawStudentId)) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => 'Student ID is required.'
+                ];
+                continue;
+            }
+
+            $student = Student::where('student_id', $rawStudentId)
+                ->orWhere('id', $rawStudentId)
+                ->first();
+
+            if (!$student) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => "Student '{$rawStudentId}' not found in database."
+                ];
+                continue;
+            }
+
+            // Verify status is enrolled
+            if ($student->status !== 'enrolled') {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => "Student '{$rawStudentId}' is not currently enrolled (Status: " . ucfirst($student->status) . ")."
+                ];
+                continue;
+            }
+
+            // Validate Subject
+            if (empty($rawSubject)) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => 'Subject name is required.'
+                ];
+                continue;
+            }
+
+            // Validate Assessment
+            if (empty($rawAssessment)) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => 'Assessment name is required.'
+                ];
+                continue;
+            }
+
+            // Validate Marks
+            if ($rawMarks === '' || !is_numeric($rawMarks) || floatval($rawMarks) < 0) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => "Marks obtained '{$rawMarks}' must be a numeric value >= 0."
+                ];
+                continue;
+            }
+            $marksObtained = floatval($rawMarks);
+
+            // Validate Max Marks
+            if ($rawMaxMarks === '' || !is_numeric($rawMaxMarks) || floatval($rawMaxMarks) < 1) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => "Maximum marks '{$rawMaxMarks}' must be a numeric value >= 1."
+                ];
+                continue;
+            }
+            $maxMarks = floatval($rawMaxMarks);
+
+            if ($marksObtained > $maxMarks) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => "Marks obtained ({$marksObtained}) cannot exceed maximum marks ({$maxMarks})."
+                ];
+                continue;
+            }
+
+            // Validate & Normalize Weight
+            $cleanedWeight = rtrim($rawWeight, '%');
+            if ($cleanedWeight === '' || !is_numeric($cleanedWeight)) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => "Weight '{$rawWeight}' must be numeric (e.g. 0.10 or 10%)."
+                ];
+                continue;
+            }
+            $weight = floatval($cleanedWeight);
+
+            if ($weight > 1.0) {
+                $weight = $weight / 100.0;
+            }
+
+            if ($weight < 0.01 || $weight > 1.00) {
+                $validationErrors[] = [
+                    'row' => $rowNum,
+                    'student_id' => $rawStudentId,
+                    'error' => "Weight ratio must resolve to a value between 0.01 and 1.00 (1% to 100%)."
+                ];
+                continue;
+            }
+
+            $rowsToInsert[] = [
+                'student_db_id' => $student->id,
+                'subject_name' => $rawSubject,
+                'assessment_name' => $rawAssessment,
+                'marks_obtained' => $marksObtained,
+                'max_marks' => $maxMarks,
+                'weight' => $weight,
+            ];
+        }
+        fclose($handle);
+
+        if (count($validationErrors) > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bulk import aborted due to validation errors. No records were saved.',
+                'errors' => $validationErrors
+            ], 422);
+        }
+
+        if (count($rowsToInsert) === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No valid data rows found in the CSV.'
+            ], 422);
+        }
+
+        $insertedCount = 0;
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($rowsToInsert, $request, &$insertedCount) {
+                foreach ($rowsToInsert as $data) {
+                    $grade = Grade::create([
+                        'student_id' => $data['student_db_id'],
+                        'subject_name' => $data['subject_name'],
+                        'assessment_name' => $data['assessment_name'],
+                        'marks_obtained' => $data['marks_obtained'],
+                        'max_marks' => $data['max_marks'],
+                        'weight' => $data['weight']
+                    ]);
+
+                    $insertedCount++;
+
+                    AuditLog::create([
+                        'user_id' => auth()->id(),
+                        'action' => 'entered_grade',
+                        'auditable_type' => Grade::class,
+                        'auditable_id' => $grade->id,
+                        'old_values' => null,
+                        'new_values' => $grade->toArray(),
+                        'ip_address' => $request->ip(),
+                    ]);
+                }
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed during bulk grade import database transaction: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'A database error occurred while saving grades: ' . $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully imported {$insertedCount} grade entries.",
+            'imported_count' => $insertedCount
+        ]);
+    }
 }
+

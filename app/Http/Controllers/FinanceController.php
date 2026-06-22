@@ -9,6 +9,8 @@ use App\Models\Student;
 use App\Models\Fee;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\AuditLog;
 
 class FinanceController extends Controller
 {
@@ -17,7 +19,7 @@ class FinanceController extends Controller
      */
     public function getFinancialDashboard()
     {
-        $invoices = Invoice::with(['student.user', 'fee'])->get();
+        $invoices = Invoice::with(['student.user', 'fee', 'payments'])->get();
         
         $totalBilled = Invoice::sum('amount');
         $totalDiscounts = Invoice::sum('discount');
@@ -189,6 +191,79 @@ class FinanceController extends Controller
             'success' => true,
             'message' => "Successfully generated {$createdCount} invoices for this fee category."
         ]);
+    }
+
+    /**
+     * Generate and download a PDF invoice.
+     */
+    public function downloadInvoicePdf(Request $request, $id)
+    {
+        $invoice = Invoice::with(['student.user', 'fee'])->findOrFail($id);
+
+        try {
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'downloaded_invoice',
+                'auditable_type' => Invoice::class,
+                'auditable_id' => $invoice->id,
+                'old_values' => null,
+                'new_values' => [
+                    'student_name' => $invoice->student->user->name,
+                    'fee_category' => $invoice->fee->name,
+                    'net_amount' => $invoice->amount - $invoice->discount,
+                    'status' => $invoice->status
+                ],
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to log invoice download audit: " . $e->getMessage());
+        }
+
+        $data = [
+            'invoice' => $invoice,
+            'netCost' => $invoice->amount - $invoice->discount,
+            'dateOfIssue' => Carbon::now()->format('F d, Y'),
+        ];
+
+        $pdf = Pdf::loadView('pdf.invoice', $data);
+
+        return $pdf->download("Invoice_{$invoice->id}.pdf");
+    }
+
+    /**
+     * Generate and download a PDF payment receipt.
+     */
+    public function downloadReceiptPdf(Request $request, $id)
+    {
+        $payment = Payment::with(['invoice.student.user', 'invoice.fee'])->findOrFail($id);
+
+        try {
+            AuditLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'downloaded_receipt',
+                'auditable_type' => Payment::class,
+                'auditable_id' => $payment->id,
+                'old_values' => null,
+                'new_values' => [
+                    'student_name' => $payment->invoice->student->user->name,
+                    'fee_category' => $payment->invoice->fee->name,
+                    'amount_paid' => $payment->amount_paid,
+                    'transaction_reference' => $payment->transaction_reference
+                ],
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to log receipt download audit: " . $e->getMessage());
+        }
+
+        $data = [
+            'payment' => $payment,
+            'dateOfIssue' => Carbon::parse($payment->payment_date)->format('F d, Y'),
+        ];
+
+        $pdf = Pdf::loadView('pdf.receipt', $data);
+
+        return $pdf->download("Receipt_{$payment->transaction_reference}.pdf");
     }
 }
 

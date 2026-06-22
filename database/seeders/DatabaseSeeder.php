@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
         DB::table('batches')->truncate();
         DB::table('courses')->truncate();
         DB::table('users')->truncate();
+        DB::table('settings')->truncate();
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         // Create Users
@@ -403,5 +404,7 @@ class DatabaseSeeder extends Seeder
                 'updated_at' => now(),
             ]
         ]);
+
+        $this->call(SettingsSeeder::class);
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\FacultyController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuditController;
+use App\Http\Controllers\SystemSettingsController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -49,12 +50,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/attendance', [AcademicController::class, 'submitAttendance']);
     Route::get('/api/grades/{studentId?}', [AcademicController::class, 'getGrades']);
     Route::post('/api/grades', [AcademicController::class, 'storeGrade']);
+    Route::post('/api/grades/bulk-import', [AcademicController::class, 'bulkImportGrades']);
     Route::get('/api/students/{id}/report-card', [AcademicController::class, 'downloadReportCard']);
 
     // 3. Finance & Invoicing
     Route::get('/api/finance', [FinanceController::class, 'getFinancialDashboard']);
     Route::post('/api/finance/pay', [FinanceController::class, 'processSandboxPayment']);
     Route::post('/api/finance/bill-batch', [FinanceController::class, 'generateBatchBilling']);
+    Route::get('/api/finance/invoices/{id}/pdf', [FinanceController::class, 'downloadInvoicePdf']);
+    Route::get('/api/finance/payments/{id}/pdf', [FinanceController::class, 'downloadReceiptPdf']);
 
     // 4. Faculty & leaves
     Route::get('/api/faculty', [FacultyController::class, 'index']);
@@ -68,6 +72,11 @@ Route::middleware('auth')->group(function () {
 
     // 6. System Audit Logs
     Route::get('/api/audit-logs', [AuditController::class, 'index']);
+    Route::get('/api/audit-logs/export', [AuditController::class, 'exportCsv']);
+
+    // 7. System Settings & Branding
+    Route::get('/api/settings', [SystemSettingsController::class, 'getSettings']);
+    Route::post('/api/settings', [SystemSettingsController::class, 'saveSettings']);
 });
 
 require __DIR__.'/auth.php';

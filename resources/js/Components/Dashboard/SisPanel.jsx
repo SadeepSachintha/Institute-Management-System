@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
 export default function SisPanel({
     students,
@@ -15,6 +16,64 @@ export default function SisPanel({
     loading
 }) {
     const pendingStudents = students.filter(s => s.document_path && s.document_status === 'pending');
+
+    const [logs, setLogs] = useState([]);
+    const [actorSearch, setActorSearch] = useState('');
+    const [actionFilter, setActionFilter] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [fetchingLogs, setFetchingLogs] = useState(false);
+    const [expandedLogId, setExpandedLogId] = useState(null);
+
+    useEffect(() => {
+        setLogs(auditLogs);
+    }, [auditLogs]);
+
+    const handleFilterSubmit = async (e) => {
+        if (e) e.preventDefault();
+        setFetchingLogs(true);
+        try {
+            const res = await axios.get('/api/audit-logs', {
+                params: {
+                    user_search: actorSearch,
+                    action: actionFilter,
+                    date_start: startDate,
+                    date_end: endDate
+                }
+            });
+            setLogs(res.data);
+        } catch (err) {
+            console.error("Failed to load filtered logs", err);
+        } finally {
+            setFetchingLogs(false);
+        }
+    };
+
+    const handleClearFilters = async () => {
+        setActorSearch('');
+        setActionFilter('');
+        setStartDate('');
+        setEndDate('');
+        setFetchingLogs(true);
+        try {
+            const res = await axios.get('/api/audit-logs');
+            setLogs(res.data);
+        } catch (err) {
+            console.error("Failed to clear filters", err);
+        } finally {
+            setFetchingLogs(false);
+        }
+    };
+
+    const handleExportCsv = () => {
+        const queryParams = new URLSearchParams({
+            user_search: actorSearch,
+            action: actionFilter,
+            date_start: startDate,
+            date_end: endDate
+        });
+        window.open(`/api/audit-logs/export?${queryParams.toString()}`, '_blank');
+    };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -165,10 +224,84 @@ export default function SisPanel({
                             </svg>
                             Institutional Audit Trail
                         </h3>
-                        <span className="text-2xs font-mono text-slate-500 uppercase tracking-widest">
-                            Secure Log
-                        </span>
+                        <button
+                            type="button"
+                            onClick={handleExportCsv}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition inline-flex items-center gap-1.5 shadow-md hover:shadow-indigo-500/10"
+                        >
+                            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Export CSV
+                        </button>
                     </div>
+
+                    {/* Glassmorphic Filters */}
+                    <form onSubmit={handleFilterSubmit} className="mb-4 grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-950/40 p-4 border border-slate-800/80 rounded-xl text-xs">
+                        <div>
+                            <label className="text-3xs uppercase tracking-widest text-slate-500 block mb-1">Actor Search</label>
+                            <input
+                                type="text"
+                                value={actorSearch}
+                                onChange={(e) => setActorSearch(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                                placeholder="Search Name/Email..."
+                            />
+                        </div>
+                        <div>
+                            <label className="text-3xs uppercase tracking-widest text-slate-500 block mb-1">Action Type</label>
+                            <select
+                                value={actionFilter}
+                                onChange={(e) => setActionFilter(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                            >
+                                <option value="">All Actions</option>
+                                <option value="entered_grade">Entered Grade</option>
+                                <option value="leave_status_changed">Leave Changed</option>
+                                <option value="processed_payment">Processed Payment</option>
+                                <option value="updated_settings">Updated Settings</option>
+                                <option value="downloaded_report_card">Downloaded Report Card</option>
+                                <option value="downloaded_invoice">Downloaded Invoice</option>
+                                <option value="downloaded_receipt">Downloaded Receipt</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-3xs uppercase tracking-widest text-slate-500 block mb-1">Start Date</label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                            />
+                        </div>
+                        <div className="flex items-end gap-2">
+                            <div className="flex-1">
+                                <label className="text-3xs uppercase tracking-widest text-slate-500 block mb-1">End Date</label>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold transition"
+                                title="Apply Filters"
+                            >
+                                Filter
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClearFilters}
+                                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium transition"
+                                title="Reset Filters"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </form>
+
                     <div className="overflow-x-auto max-h-[300px] overflow-y-auto pr-1">
                         <table className="w-full text-left text-xs text-slate-400">
                             <thead className="bg-slate-950 text-slate-300 border-b border-slate-800 sticky top-0 z-10">
@@ -181,48 +314,82 @@ export default function SisPanel({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/40">
-                                {auditLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-slate-800/20 transition">
-                                        <td className="py-2.5 px-3 font-medium text-white">
-                                            {log.user?.name || 'System / Batch'}
-                                            <span className="block text-3xs text-slate-500 font-mono mt-0.5">
-                                                {log.user?.email || 'automated@ims.core'}
-                                            </span>
-                                        </td>
-                                        <td className="py-2.5 px-3 font-mono text-2xs">
-                                            <span className={`inline-block px-1.5 py-0.5 rounded text-3xs uppercase font-semibold ${
-                                                log.action === 'entered_grade' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
-                                                log.action === 'leave_status_changed' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                            }`}>
-                                                {log.action.replace('_', ' ')}
-                                            </span>
-                                        </td>
-                                        <td className="py-2.5 px-3 text-2xs text-slate-300">
-                                            <span className="font-mono text-3xs text-slate-500 block">
-                                                {log.auditable_type?.split('\\').pop() || 'N/A'} (ID: {log.auditable_id})
-                                            </span>
-                                            {log.new_values && (
-                                                <span className="block text-3xs text-slate-400 italic mt-0.5">
-                                                    {log.action === 'leave_status_changed' 
-                                                        ? `Status: ${log.old_values?.status} → ${log.new_values?.status}`
-                                                        : log.action === 'entered_grade'
-                                                            ? `Assessment: ${log.new_values?.assessment_name} (${log.new_values?.marks_obtained}/${log.new_values?.max_marks} marks)`
-                                                            : `Transaction logged`
-                                                    }
+                                {logs.map((log) => (
+                                    <React.Fragment key={log.id}>
+                                        <tr 
+                                            onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                                            className="hover:bg-slate-800/20 transition cursor-pointer"
+                                            title="Click to expand values details"
+                                        >
+                                            <td className="py-2.5 px-3 font-medium text-white">
+                                                {log.user?.name || 'System / Batch'}
+                                                <span className="block text-3xs text-slate-500 font-mono mt-0.5">
+                                                    {log.user?.email || 'automated@ims.core'}
                                                 </span>
-                                            )}
-                                        </td>
-                                        <td className="py-2.5 px-3 font-mono text-3xs text-slate-500">{log.ip_address || '127.0.0.1'}</td>
-                                        <td className="py-2.5 px-3 text-right text-slate-500 text-3xs font-mono">
-                                            {new Date(log.created_at).toLocaleString()}
-                                        </td>
-                                    </tr>
+                                            </td>
+                                            <td className="py-2.5 px-3 font-mono text-2xs">
+                                                <span className={`inline-block px-1.5 py-0.5 rounded text-3xs uppercase font-semibold ${
+                                                    log.action === 'entered_grade' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' :
+                                                    log.action === 'leave_status_changed' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                }`}>
+                                                    {log.action.replace('_', ' ')}
+                                                </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-2xs text-slate-300">
+                                                <span className="font-mono text-3xs text-slate-500 block">
+                                                    {log.auditable_type?.split('\\').pop() || 'N/A'} (ID: {log.auditable_id})
+                                                </span>
+                                                {log.new_values && (
+                                                    <span className="block text-3xs text-slate-400 italic mt-0.5">
+                                                        {log.action === 'leave_status_changed' 
+                                                            ? `Status: ${log.old_values?.status} → ${log.new_values?.status}`
+                                                            : log.action === 'entered_grade'
+                                                                ? `Assessment: ${log.new_values?.assessment_name} (${log.new_values?.marks_obtained}/${log.new_values?.max_marks} marks)`
+                                                                : `Transaction logged`
+                                                        }
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="py-2.5 px-3 font-mono text-3xs text-slate-500">{log.ip_address || '127.0.0.1'}</td>
+                                            <td className="py-2.5 px-3 text-right text-slate-500 text-3xs font-mono">
+                                                {new Date(log.created_at).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                        {expandedLogId === log.id && (
+                                            <tr className="bg-slate-950/40">
+                                                <td colSpan="5" className="p-4 border-t border-b border-slate-800/60">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                                                        <div>
+                                                            <span className="text-3xs uppercase tracking-widest text-slate-500 block mb-1">Before State (Old Values)</span>
+                                                            {log.old_values && Object.keys(log.old_values).length > 0 ? (
+                                                                <pre className="text-3xs font-mono text-rose-300 bg-rose-950/15 border border-rose-900/25 p-3 rounded-lg overflow-x-auto max-h-[160px]">
+                                                                    {JSON.stringify(log.old_values, null, 2)}
+                                                                </pre>
+                                                            ) : (
+                                                                <span className="text-3xs text-slate-500 italic block p-3 bg-slate-900/20 rounded-lg">No prior values (Creation Event)</span>
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-3xs uppercase tracking-widest text-slate-500 block mb-1">After State (New Values)</span>
+                                                            {log.new_values && Object.keys(log.new_values).length > 0 ? (
+                                                                <pre className="text-3xs font-mono text-emerald-300 bg-emerald-950/15 border border-emerald-900/25 p-3 rounded-lg overflow-x-auto max-h-[160px]">
+                                                                    {JSON.stringify(log.new_values, null, 2)}
+                                                                </pre>
+                                                            ) : (
+                                                                <span className="text-3xs text-slate-500 italic block p-3 bg-slate-900/20 rounded-lg font-mono">No modifications applied</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))}
-                                {auditLogs.length === 0 && (
+                                {logs.length === 0 && (
                                     <tr>
                                         <td colSpan="5" className="py-8 text-center text-slate-500 italic">
-                                            No administrative actions have been audited yet.
+                                            {fetchingLogs ? "Querying registry logs..." : "No administrative actions match the active query."}
                                         </td>
                                     </tr>
                                 )}

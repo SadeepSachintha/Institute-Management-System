@@ -56,6 +56,7 @@ export default function FinancePanel({ finance }) {
                                     <th className="py-3 px-4 font-semibold">Net Cost</th>
                                     <th className="py-3 px-4 font-semibold">Billed Date</th>
                                     <th className="py-3 px-4 font-semibold">Payment Status</th>
+                                    <th className="py-3 px-4 font-semibold text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/50">
@@ -74,11 +75,33 @@ export default function FinancePanel({ finance }) {
                                                 {inv.status}
                                             </span>
                                         </td>
+                                        <td className="py-3 px-4 text-right flex items-center justify-end gap-1.5">
+                                            <button
+                                                onClick={() => window.open(`/api/finance/invoices/${inv.id}/pdf`, '_blank')}
+                                                className="p-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-indigo-400 hover:text-indigo-300 rounded-lg transition"
+                                                title="Print Invoice"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                                </svg>
+                                            </button>
+                                            {inv.status === 'paid' && inv.payments && inv.payments.length > 0 && (
+                                                <button
+                                                    onClick={() => window.open(`/api/finance/payments/${inv.payments[0].id}/pdf`, '_blank')}
+                                                    className="p-1.5 bg-slate-850 hover:bg-slate-800 border border-slate-700/60 text-emerald-400 hover:text-emerald-300 rounded-lg transition"
+                                                    title="Print Receipt"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                </button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                                 {finance.invoices.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="py-8 text-center text-slate-500">No invoices recorded.</td>
+                                        <td colSpan="6" className="py-8 text-center text-slate-500">No invoices recorded.</td>
                                     </tr>
                                 )}
                             </tbody>

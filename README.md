@@ -10,23 +10,30 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 * **Onboarding State Machine:** Automates transitions from Inquiry $\rightarrow$ Applicant $\rightarrow$ Enrolled $\rightarrow$ Alumni.
 * **Document Verification Queue:** Administrative queue showing applicant PDFs/images, verifying status, and promoting profiles to enrolled.
 * **Institutional Audit Trail:** Logs administrative events (entered grades, leave updates, tuition payments) with IP addresses and before/after values.
+* **Interactive Audit Explorer:** View administrative activities side-by-side (before/after JSON differences) and export streaming CSV logs.
 * **Automatic ID Generation:** Generates unique student IDs (`STU-YYYY-XXXX`) the moment enrollment registration is completed.
 
 ### 2. Academic & Course Management
 * **Collision Timetable Scheduler:** Course scheduling with double-booking checks on faculty, room, and student batch cohorts.
 * **Database & Mail Alerts:** Absences and leave status approvals trigger database logs and mock emails via Laravel's notification channel framework.
 * **Gradebook:** Configurable assessment parameters, weighting calculations, and cumulative GPA logs.
+* **Bulk Grade Importer:** Drag-and-drop CSV importer with flexible header matching, client-side pre-parsing previews, and transaction-controlled rollbacks.
+* **PDF Report Card Generator:** Auto-calculates cumulative percentages, GPAs, and cohort rankings, exporting transcripts to printable PDF reports.
 
 ### 3. Financial & Fee Management
 * **Automated Billing:** Dynamic tuition, library, and transportation fee invoicing.
 * **Tuition Sandbox Portal:** A payment simulation sandbox for students/parents to process outstanding dues and get instant digital receipts.
+* **PDF Invoice & Receipt Exporter:** Generates verified billing invoices and payment receipts in a styled HSL print template.
 * **Revenue Dashboard:** Premium HSL-gradient interactive Area charts tracking collections, paid invoices, and outstanding balances.
 
 ### 4. Faculty & HR Management
 * **Leave Requests:** Approval workflow for leaves with workloads mapping.
 * **Faculty Profiles:** Qualifications tracker, department assignments, and teaching hour capacities.
 
-### 5. AI Analytics & Early Warning System
+### 5. Branding & Live Configuration
+* **Live Settings Manager:** Admin settings to dynamically manage institution branding, URL references, and grade threshold boundaries.
+
+### 6. AI Analytics & Early Warning System
 * **Early Warning Explainability:** scikit-learn `LogisticRegression` model flags dropout risks and returns SHAP-like feature contributions (attendance, grades, lateness, absences) mapped onto graphical progress meters.
 * **Seasonality-Aware Forecasts:** Predicts enrollments using Classical Additive Time-Series Decomposition to model term-based peaks.
 * **Global Toast Center:** Real-time stackable visual notifications alerting administrators and faculty of onboarding workflows, attendance logs, and invoice payments.
@@ -171,16 +178,55 @@ For development safety and to prevent conflicting with existing default database
 ---
 
 ## 🧪 Verification & Demo Testing
-1. **Login credentials:**
-   * **Admin:** `admin@ims.com` (password: `password`)
-   * **Faculty:** `alan@ims.com` (password: `password`)
-   * **Student (High Risk):** `john@ims.com` (password: `password`) - *low grades and attendance*
-   * **Student (Perfect):** `jane@ims.com` (password: `password`)
-   * **Parent:** `sarah@ims.com` (password: `password`)
-2. **AI Early Warning Test:** 
-   Log in as Dr. Alan Turing, navigate to the gradebook or attendance logger, modify John Doe's attendance to "absent" and input failing marks, then check the Analytics Dashboard to see the risk probability index update dynamically via the ML microservice.
-3. **Workflow Automation Test:** 
-   Log in as Student Alice Cooper, who has status "applicant". Go to the Payment Sandbox, complete the fee payment of \$300. Verify the system automatically generates student ID `STU-2026-0003` and shifts her status to "enrolled".
+
+### 1. Verification Login Credentials
+* **Admin:** `admin@ims.com` (password: `password`)
+* **Faculty:** `alan@ims.com` (password: `password`)
+* **Student (High Risk / John Doe):** `john@ims.com` (password: `password`) - *low grades and attendance*
+* **Student (Perfect / Jane Smith):** `jane@ims.com` (password: `password`)
+* **Student (Applicant / Alice Cooper):** `alice@ims.com` (password: `password`)
+* **Parent:** `sarah@ims.com` (password: `password`)
+
+---
+
+### 2. Manual Verification Guides
+
+#### 🖨️ PDF Invoice, Receipt, & Report Card Exporters
+1. **Students**: Log in as student John Doe (`john@ims.com`). Navigate to the **Grades** view and click **Download Report Card (PDF)** to print the transcript. Navigate to the **Tuition** view and click **Download Invoice (PDF)** or **Download Receipt (PDF)** for transaction details.
+2. **Administrators**: Log in as Admin (`admin@ims.com`), go to **SIS Central Registry** or **Financial Ledger** and download official report cards, invoices, and receipt PDFs for any student.
+
+#### ⚙️ Live System Settings & Branding Manager
+1. Log in as Admin (`admin@ims.com`), navigate to the **Branding & Settings** tab in the main sidebar.
+2. Change the Institution Name (e.g. to a custom name) and Institution Website URL. Click **Save Settings**.
+3. Observe that the branding change immediately propagates to the dashboard headers and all downloaded PDF headers.
+4. Modify the letter grading thresholds (A+, A, B, C) and verify that transcript GPAs adapt to the modified thresholds dynamically.
+
+#### 🔍 Interactive Audit Log Explorer & Exporter
+1. Log in as Admin (`admin@ims.com`), navigate to the **SIS Central Registry** tab and scroll to the **Institutional Audit Trail**.
+2. Click any log row to expand it. Inspect the side-by-side JSON diff viewer highlighting changes in Old vs New states.
+3. Use the filter bar to search by Actor name, filter by specific actions (e.g. `'processed_payment'`), or filter by Date range.
+4. Click **Export CSV** to stream and download the filtered activity logs as a spreadsheet.
+
+#### 📥 Bulk Grade Book CSV Importer
+1. Log in as Faculty Dr. Alan Turing (`alan@ims.com`), navigate to the **Gradebook** tab.
+2. Toggle the **Bulk Import (CSV)** button on the right sidebar form.
+3. Click **Download Template** to fetch a pre-formatted sample CSV.
+4. Upload a CSV with invalid entries (e.g. non-existent student IDs, marks exceeding max marks) and verify that the red box displays the exact row numbers and error descriptions.
+5. Upload a valid CSV and click **Process CSV Import**. Verify that all records are successfully imported in a database transaction, updating the Grade Registry instantly.
+
+---
+
+### 3. Core Automated Tests
+To run the automated backend validations for the Bulk CSV Importer:
+```powershell
+./php.bat artisan test --filter=BulkGradeImportTest
+```
+
+---
+
+### 4. Baseline Core Demos
+1. **AI Early Warning Test:** Log in as Dr. Alan Turing, modify John Doe's attendance to "absent" and input failing marks, then check the Analytics Dashboard to see the risk probability index and SHAP explanation update dynamically via the ML microservice.
+2. **Workflow Automation Test:** Log in as Student Alice Cooper, who has status "applicant". Go to the Payment Sandbox, complete the fee payment of \$300. Verify the system automatically generates student ID `STU-2026-0003` and shifts her status to "enrolled".
 
 ---
 
