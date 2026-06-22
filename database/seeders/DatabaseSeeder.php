@@ -15,7 +15,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // Clear tables
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = OFF;');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        }
         DB::table('leave_requests')->truncate();
         DB::table('payments')->truncate();
         DB::table('invoices')->truncate();
@@ -30,7 +34,11 @@ class DatabaseSeeder extends Seeder
         DB::table('courses')->truncate();
         DB::table('users')->truncate();
         DB::table('settings')->truncate();
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = ON;');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        }
 
         // Create Users
         $password = Hash::make('password');

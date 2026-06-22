@@ -177,6 +177,25 @@ For development safety and to prevent conflicting with existing default database
 
 ---
 
+### Option C: Standalone Desktop Packaging (NativePHP)
+
+This option packages the Institute Management System as a native standalone desktop app (using Electron) that runs locally on target PCs offline.
+
+#### Step 1: Start the Local Desktop Development App
+Running this command boots the React frontend inside an Electron desktop window, initializes a portable local database (using SQLite), and automatically launches the Python analytics FastAPI sidecar server silently in the background:
+```powershell
+./php.bat artisan native:serve
+```
+
+#### Step 2: Build the Production Executable
+To package the entire application (including UI resources, PHP binaries, and local configurations) into a single standalone program installer (`IMS.exe` for Windows, `IMS.app` for Mac):
+```powershell
+./php.bat artisan native:build
+```
+The compiled standalone executable installer will be generated in the `dist/` directory.
+
+---
+
 ## 🧪 Verification & Demo Testing
 
 ### 1. Verification Login Credentials
