@@ -18,12 +18,12 @@ trait ExecuteCommand
     ): void {
         $envs = [
             'install' => [
-                'NATIVEPHP_PHP_BINARY_VERSION' => PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION,
+                'NATIVEPHP_PHP_BINARY_VERSION' => (PHP_MAJOR_VERSION < 8 || (PHP_MAJOR_VERSION == 8 && PHP_MINOR_VERSION < 3)) ? '8.3' : PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION,
                 'NATIVEPHP_PHP_BINARY_PATH' => base_path($this->phpBinaryPath()),
             ],
             'serve' => [
                 'APP_PATH' => base_path(),
-                'NATIVEPHP_PHP_BINARY_VERSION' => PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION,
+                'NATIVEPHP_PHP_BINARY_VERSION' => (PHP_MAJOR_VERSION < 8 || (PHP_MAJOR_VERSION == 8 && PHP_MINOR_VERSION < 3)) ? '8.3' : PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION,
                 'NATIVEPHP_PHP_BINARY_PATH' => base_path($this->phpBinaryPath()),
                 'NATIVE_PHP_SKIP_QUEUE' => $skip_queue,
                 'NATIVEPHP_BUILDING' => false,

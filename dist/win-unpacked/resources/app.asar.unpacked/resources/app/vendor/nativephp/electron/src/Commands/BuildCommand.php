@@ -140,7 +140,7 @@ class BuildCommand extends Command
                 'APP_PATH' => $this->sourcePath(),
                 'APP_URL' => config('app.url'),
                 'NATIVEPHP_BUILDING' => true,
-                'NATIVEPHP_PHP_BINARY_VERSION' => PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION,
+                'NATIVEPHP_PHP_BINARY_VERSION' => (PHP_MAJOR_VERSION < 8 || (PHP_MAJOR_VERSION == 8 && PHP_MINOR_VERSION < 3)) ? '8.3' : PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION,
                 'NATIVEPHP_PHP_BINARY_PATH' => $this->sourcePath($this->phpBinaryPath()),
                 'NATIVEPHP_APP_NAME' => config('app.name'),
                 'NATIVEPHP_APP_ID' => config('nativephp.app_id'),
