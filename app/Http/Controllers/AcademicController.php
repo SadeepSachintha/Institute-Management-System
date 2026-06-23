@@ -385,7 +385,7 @@ class AcademicController extends Controller
 
         $pdf = Pdf::loadView('pdf.report_card', $data);
         
-        return $pdf->download("Report_Card_{$student->student_id}.pdf");
+        return $pdf->stream("Report_Card_{$student->student_id}.pdf");
     }
 
     /**
