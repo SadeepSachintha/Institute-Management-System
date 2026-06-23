@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
         DB::table('faculty')->truncate();
         DB::table('parents')->truncate();
         DB::table('students')->truncate();
+        DB::table('batch_student')->truncate();
         DB::table('batches')->truncate();
         DB::table('courses')->truncate();
         DB::table('users')->truncate();
@@ -194,8 +195,15 @@ class DatabaseSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
+        // Enroll students in batches
+        DB::table('batch_student')->insert([
+            ['student_id' => $student1Id, 'batch_id' => $batch1Id, 'created_at' => now(), 'updated_at' => now()],
+            ['student_id' => $student2Id, 'batch_id' => $batch1Id, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
         // Parents Profiles
         DB::table('parents')->insert([
+
             'user_id' => $parentId,
             'student_id' => $student1Id,
             'relationship' => 'Mother',

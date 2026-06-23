@@ -38,4 +38,10 @@ class Student extends Model
     {
         return $this->hasMany(Invoice::class);
     }
+
+    public function batches(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Batch::class);
+    }
 }
+

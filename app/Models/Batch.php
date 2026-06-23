@@ -19,4 +19,10 @@ class Batch extends Model
     {
         return $this->hasMany(Timetable::class);
     }
+
+    public function students(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Student::class);
+    }
 }
+

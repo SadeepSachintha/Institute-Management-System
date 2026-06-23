@@ -150,4 +150,21 @@ class ImsTest extends TestCase
         $this->assertEquals('enrolled', $freshStudent->status);
         $this->assertStringStartsWith('STU-2026-', $freshStudent->student_id);
     }
+
+    /**
+     * Test report card generation and download.
+     */
+    public function test_download_report_card()
+    {
+        $this->actingAs($this->adminUser);
+
+        // Enroll student in batch
+        $this->student->batches()->attach($this->batch->id);
+
+        $response = $this->get("/api/students/{$this->student->id}/report-card");
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'application/pdf');
+    }
 }
+
