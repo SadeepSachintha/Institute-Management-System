@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'database'),
+    'driver' => env('NATIVEPHP_RUNNING') ? 'file' : env('SESSION_DRIVER', 'database'),
 
     /*
     |--------------------------------------------------------------------------

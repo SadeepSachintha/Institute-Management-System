@@ -27,30 +27,43 @@ app.add_middleware(
 )
 
 # DB config from env with default fallbacks
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
-DB_PORT = int(os.getenv("DB_PORT", "3307"))
-DB_NAME = os.getenv("DB_DATABASE", "ims_db")
-DB_USER = os.getenv("DB_USERNAME", "root")
-DB_PASS = os.getenv("DB_PASSWORD", "")
-
-# Construct DB URL for connection pooling (supporting password-less connections)
-DB_USER_ESC = DB_USER.replace(":", "%3a").replace("@", "%40") if DB_USER else "root"
-DB_PASS_ESC = DB_PASS.replace(":", "%3a").replace("@", "%40") if DB_PASS else ""
-DATABASE_URL = f"mysql+pymysql://{DB_USER_ESC}:{DB_PASS_ESC}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
-# SQLAlchemy connection pooling engine
+DB_CONNECTION = os.getenv("DB_CONNECTION", "mysql")
 engine = None
-try:
-    engine = create_engine(
-        DATABASE_URL,
-        poolclass=QueuePool,
-        pool_size=10,
-        max_overflow=20,
-        pool_recycle=3600,
-        pool_pre_ping=True
-    )
-except Exception as e:
-    print(f"SQLAlchemy database pool initialization error: {e}")
+
+if DB_CONNECTION == "sqlite":
+    sqlite_db = os.getenv("DB_DATABASE", "database/database.sqlite")
+    DATABASE_URL = f"sqlite:///{sqlite_db}"
+    try:
+        engine = create_engine(
+            DATABASE_URL,
+            connect_args={"timeout": 30}
+        )
+    except Exception as e:
+        print(f"SQLAlchemy SQLite database initialization error: {e}")
+else:
+    DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
+    DB_PORT = int(os.getenv("DB_PORT", "3307"))
+    DB_NAME = os.getenv("DB_DATABASE", "ims_db")
+    DB_USER = os.getenv("DB_USERNAME", "root")
+    DB_PASS = os.getenv("DB_PASSWORD", "")
+
+    # Construct DB URL for connection pooling (supporting password-less connections)
+    DB_USER_ESC = DB_USER.replace(":", "%3a").replace("@", "%40") if DB_USER else "root"
+    DB_PASS_ESC = DB_PASS.replace(":", "%3a").replace("@", "%40") if DB_PASS else ""
+    DATABASE_URL = f"mysql+pymysql://{DB_USER_ESC}:{DB_PASS_ESC}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+    # SQLAlchemy connection pooling engine
+    try:
+        engine = create_engine(
+            DATABASE_URL,
+            poolclass=QueuePool,
+            pool_size=10,
+            max_overflow=20,
+            pool_recycle=3600,
+            pool_pre_ping=True
+        )
+    except Exception as e:
+        print(f"SQLAlchemy database pool initialization error: {e}")
 
 @app.get("/")
 def health_check():
@@ -145,15 +158,27 @@ def forecast_enrollment():
     try:
         with engine.connect() as conn:
             # Query enrollment history grouped by month
-            result = conn.execute(text("""
-                SELECT 
-                    DATE_FORMAT(created_at, '%Y-%m') as month_str,
-                    COUNT(id) as enrollment_count
-                FROM students
-                WHERE status = 'enrolled'
-                GROUP BY DATE_FORMAT(created_at, '%Y-%m')
-                ORDER BY month_str ASC
-            """))
+            if DB_CONNECTION == "sqlite":
+                query_str = """
+                    SELECT 
+                        strftime('%Y-%m', created_at) as month_str,
+                        COUNT(id) as enrollment_count
+                    FROM students
+                    WHERE status = 'enrolled'
+                    GROUP BY strftime('%Y-%m', created_at)
+                    ORDER BY month_str ASC
+                """
+            else:
+                query_str = """
+                    SELECT 
+                        DATE_FORMAT(created_at, '%Y-%m') as month_str,
+                        COUNT(id) as enrollment_count
+                    FROM students
+                    WHERE status = 'enrolled'
+                    GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+                    ORDER BY month_str ASC
+                """
+            result = conn.execute(text(query_str))
             records = result.mappings().all()
             
         # Parse data and fall back to synthetic seasonality if database lacks historical depth
