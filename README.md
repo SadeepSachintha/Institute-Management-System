@@ -193,12 +193,17 @@ Running this command boots the React frontend inside an Electron desktop window,
 ```
 *(Note: Running `storage:link` beforehand ensures uploaded applicant documents can be successfully viewed locally.)*
 
-#### Step 2: Build the Production Executable
-To package the entire application (including UI resources, PHP binaries, and local configurations) into a single standalone program installer (`IMS.exe` for Windows, `IMS.app` for Mac):
+#### Step 2: Build the Production Executable (Local Pipeline)
+To clean caches, optimize dependencies, prune dev logs, and compile frontend assets before bundling the desktop application:
 ```powershell
-./php.bat artisan native:build
+powershell -ExecutionPolicy Bypass -File ./build-pipeline.ps1
 ```
-The compiled standalone executable installer will be generated in the `dist/` directory.
+The generated standalone installer will be output to the `dist/` directory.
+
+#### Step 3: CI/CD Pipeline & Automatic Code Signing
+The application includes a pre-configured GitHub Actions build workflow to compile the installer on clean cloud runner VMs:
+* **Workflow File**: [.github/workflows/build-desktop.yml](file:///d:/xampp/htdocs/Institute%20Management%20System/.github/workflows/build-desktop.yml)
+* **Automatic Signing**: Add a base64 encoded PFX certificate string as `CSC_LINK` and its password as `CSC_KEY_PASSWORD` under repository Secrets. The runner will sign the `.exe` dynamically during build.
 
 ---
 
