@@ -15,9 +15,9 @@ class SystemSettingsController extends Controller
     public function getSettings()
     {
         return response()->json([
-            'institution_name' => Setting::get('institution_name', 'SS LABZ INSTITUTE'),
+            'institution_name' => Setting::get('institution_name', 'INSTITUTE CONTROL CENTER'),
             'logo_url' => Setting::get('logo_url', ''),
-            'domain_url' => Setting::get('domain_url', 'ss-labz.pages.dev'),
+            'domain_url' => Setting::get('domain_url', 'localhost:8000'),
             'grade_threshold_a_plus' => floatval(Setting::get('grade_threshold_a_plus', 90)),
             'grade_threshold_a' => floatval(Setting::get('grade_threshold_a', 80)),
             'grade_threshold_b' => floatval(Setting::get('grade_threshold_b', 70)),
@@ -41,9 +41,9 @@ class SystemSettingsController extends Controller
         ]);
 
         $oldValues = [
-            'institution_name' => Setting::get('institution_name', 'SS LABZ INSTITUTE'),
+            'institution_name' => Setting::get('institution_name', 'INSTITUTE CONTROL CENTER'),
             'logo_url' => Setting::get('logo_url', ''),
-            'domain_url' => Setting::get('domain_url', 'ss-labz.pages.dev'),
+            'domain_url' => Setting::get('domain_url', 'localhost:8000'),
             'grade_threshold_a_plus' => Setting::get('grade_threshold_a_plus', 90),
             'grade_threshold_a' => Setting::get('grade_threshold_a', 80),
             'grade_threshold_b' => Setting::get('grade_threshold_b', 70),

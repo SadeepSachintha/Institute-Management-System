@@ -166,5 +166,67 @@ class ImsTest extends TestCase
         $response->assertStatus(200);
         $response->assertHeader('Content-Type', 'application/pdf');
     }
+
+    /**
+     * Test student document verification updates and persists document_status.
+     */
+    public function test_student_document_verification_persists_status()
+    {
+        $this->actingAs($this->adminUser);
+
+        $this->student->update([
+            'document_path' => 'documents/test.pdf',
+            'document_status' => 'pending'
+        ]);
+
+        $response = $this->postJson("/api/students/{$this->student->id}/verify-document", [
+            'status' => 'approved'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('student.document_status', 'approved');
+
+        // Check DB state
+        $freshStudent = Student::find($this->student->id);
+        $this->assertEquals('approved', $freshStudent->document_status);
+        $this->assertEquals('enrolled', $freshStudent->status);
+    }
+
+    /**
+     * Test invoice PDF streaming inline.
+     */
+    public function test_invoice_pdf_streams_inline()
+    {
+        $this->actingAs($this->adminUser);
+
+        $response = $this->get("/api/finance/invoices/{$this->invoice->id}/pdf");
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $response->assertHeader('Content-Disposition', 'inline; filename=Invoice_' . $this->invoice->id . '.pdf');
+    }
+
+    /**
+     * Test receipt PDF streaming inline.
+     */
+    public function test_receipt_pdf_streams_inline()
+    {
+        $this->actingAs($this->adminUser);
+
+        $payment = \App\Models\Payment::create([
+            'invoice_id' => $this->invoice->id,
+            'amount_paid' => 1500.00,
+            'payment_method' => 'Sandbox Card',
+            'transaction_reference' => 'TXN-TEST-9999',
+            'payment_date' => \Carbon\Carbon::now()
+        ]);
+
+        $response = $this->get("/api/finance/payments/{$payment->id}/pdf");
+
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $response->assertHeader('Content-Disposition', 'inline; filename=Receipt_' . $payment->transaction_reference . '.pdf');
+    }
 }
 

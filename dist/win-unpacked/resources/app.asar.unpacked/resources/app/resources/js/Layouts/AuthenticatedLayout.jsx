@@ -174,7 +174,7 @@ export default function AuthenticatedLayout({ header, children }) {
             <main>{children}</main>
 
             <footer className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 border-t border-slate-900/60 text-center text-3xs font-mono text-slate-600 tracking-widest uppercase">
-                Product of <a href="https://ss-labz.pages.dev" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition">SS Labz</a>
+                © {new Date().getFullYear()} Institute Management System. All rights reserved.
             </footer>
         </div>
     );

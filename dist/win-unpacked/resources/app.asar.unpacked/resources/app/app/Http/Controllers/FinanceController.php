@@ -227,7 +227,7 @@ class FinanceController extends Controller
 
         $pdf = Pdf::loadView('pdf.invoice', $data);
 
-        return $pdf->download("Invoice_{$invoice->id}.pdf");
+        return $pdf->stream("Invoice_{$invoice->id}.pdf");
     }
 
     /**
@@ -263,7 +263,7 @@ class FinanceController extends Controller
 
         $pdf = Pdf::loadView('pdf.receipt', $data);
 
-        return $pdf->download("Receipt_{$payment->transaction_reference}.pdf");
+        return $pdf->stream("Receipt_{$payment->transaction_reference}.pdf");
     }
 }
 

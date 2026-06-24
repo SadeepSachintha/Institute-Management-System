@@ -72,14 +72,9 @@ export default function Welcome({ auth }) {
             {/* Hero Section */}
             <main className="relative z-10 max-w-7xl w-full mx-auto px-6 py-12 flex flex-col items-center text-center my-auto">
                 <div className="space-y-6 max-w-3xl mb-16">
-                    <a
-                        href="https://ss-labz.pages.dev"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 border border-indigo-500/20 text-indigo-405 hover:bg-indigo-500/20 hover:text-indigo-300 uppercase tracking-widest transition-all duration-200"
-                    >
-                        A Product of SS Labz ➜
-                    </a>
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 uppercase tracking-widest">
+                        Unified Administration Platform
+                    </span>
                     <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-none bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
                         The Central Nervous System of Your Educational Institution
                     </h1>

@@ -147,8 +147,8 @@
                 </svg>
             </td>
             <td class="header-title-box">
-                <h1 class="header-title">{{ \App\Models\Setting::get('institution_name', 'SS LABZ INSTITUTE') }}</h1>
-                <p class="header-subtitle">Official Payment Receipt &bull; {{ \App\Models\Setting::get('domain_url', 'ss-labz.pages.dev') }}</p>
+                <h1 class="header-title">{{ \App\Models\Setting::get('institution_name', 'INSTITUTE CONTROL CENTER') }}</h1>
+                <p class="header-subtitle">Official Payment Receipt &bull; {{ \App\Models\Setting::get('domain_url', 'localhost:8000') }}</p>
             </td>
             <td class="header-right">
                 <span class="receipt-badge">Payment Receipt</span>

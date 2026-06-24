@@ -13,9 +13,9 @@ class SettingsSeeder extends Seeder
     public function run(): void
     {
         DB::table('settings')->insert([
-            ['key' => 'institution_name', 'value' => 'SS LABZ INSTITUTE', 'created_at' => now(), 'updated_at' => now()],
+            ['key' => 'institution_name', 'value' => 'INSTITUTE CONTROL CENTER', 'created_at' => now(), 'updated_at' => now()],
             ['key' => 'logo_url', 'value' => '', 'created_at' => now(), 'updated_at' => now()],
-            ['key' => 'domain_url', 'value' => 'ss-labz.pages.dev', 'created_at' => now(), 'updated_at' => now()],
+            ['key' => 'domain_url', 'value' => 'localhost:8000', 'created_at' => now(), 'updated_at' => now()],
             ['key' => 'grade_threshold_a_plus', 'value' => '90', 'created_at' => now(), 'updated_at' => now()],
             ['key' => 'grade_threshold_a', 'value' => '80', 'created_at' => now(), 'updated_at' => now()],
             ['key' => 'grade_threshold_b', 'value' => '70', 'created_at' => now(), 'updated_at' => now()],
