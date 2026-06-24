@@ -136,8 +136,6 @@ export default function Welcome({ auth }) {
                     © 2026 Institute Management System. Developed by <a href="https://ss-labz.pages.dev" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 transition">SS Labz</a>.
                 </span>
                 <div className="flex gap-4 text-3xs text-slate-600 font-mono uppercase tracking-wider">
-                    <a href="https://ss-labz.pages.dev" target="_blank" rel="noopener noreferrer" className="hover:text-slate-400 transition">SS Labz Home</a>
-                    <span>•</span>
                     <span className="hover:text-slate-400 cursor-pointer">MLOps Engine</span>
                 </div>
             </footer>

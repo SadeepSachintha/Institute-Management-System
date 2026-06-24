@@ -1,1 +1,0 @@
-import{j as a}from"./app-cZ9qH0cx.js";function o({value:t,className:e="",children:s,...r}){return a.jsx("label",{...r,className:"block text-xs font-semibold text-slate-400 tracking-wider uppercase "+e,children:t||s})}export{o as I};
