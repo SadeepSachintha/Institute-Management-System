@@ -191,8 +191,8 @@
                 </svg>
             </td>
             <td class="header-title-box">
-                <h1 class="header-title">{{ \App\Models\Setting::get('institution_name', 'SS LABZ INSTITUTE') }}</h1>
-                <p class="header-subtitle">Official Academic Registry &bull; {{ \App\Models\Setting::get('domain_url', 'ss-labz.pages.dev') }}</p>
+                <h1 class="header-title">{{ \App\Models\Setting::get('institution_name', 'INSTITUTE CONTROL CENTER') }}</h1>
+                <p class="header-subtitle">Official Academic Registry &bull; {{ \App\Models\Setting::get('domain_url', 'localhost:8000') }}</p>
             </td>
             <td class="header-right">
                 <span class="report-badge">Official Report Card</span>
@@ -309,7 +309,7 @@
             <td class="signature-box">
                 <div class="signature-line font-mono" style="font-size: 11px; color: #94a3b8; font-style: italic; border-top: none;">[Dean Authorized Sign]</div>
                 <div class="signature-line">Dean of Academic Affairs</div>
-                <div class="signature-title">{{ \App\Models\Setting::get('institution_name', 'SS Labz') }} Academics</div>
+                <div class="signature-title">{{ \App\Models\Setting::get('institution_name', 'INSTITUTE') }} Academics</div>
             </td>
         </tr>
     </table>

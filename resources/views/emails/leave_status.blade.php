@@ -119,7 +119,7 @@
     <div class="container">
         <div class="header">
             <h1>IMS Human Resources</h1>
-            <p>A Product of SS Labz</p>
+            <p>Institute Management System</p>
         </div>
         <div class="content">
             <h2>Leave Request Decision</h2>
@@ -128,7 +128,7 @@
             
             <div style="text-align: center;">
                 <span class="status-badge {{ $status === 'approved' ? 'status-approved' : 'status-rejected' }}">
-                    {{ $status }}
+                     {{ $status }}
                 </span>
             </div>
 
@@ -152,12 +152,12 @@
             </table>
 
             <div style="text-align: center;">
-                <a href="https://ss-labz.pages.dev" class="btn" target="_blank">Access Portal</a>
+                <a href="{{ \App\Models\Setting::get('domain_url', 'http://localhost') }}" class="btn" target="_blank">Access Portal</a>
             </div>
         </div>
         <div class="footer">
-            <p>&copy; {{ date('Y') }} SS Labz. All rights reserved.</p>
-            <p>If you have any questions, visit our site at <a href="https://ss-labz.pages.dev">ss-labz.pages.dev</a>.</p>
+            <p>&copy; {{ date('Y') }} Institute Management System. All rights reserved.</p>
+            <p>If you have any questions, visit our site at <a href="{{ \App\Models\Setting::get('domain_url', 'http://localhost') }}">{{ \App\Models\Setting::get('domain_url', 'localhost') }}</a>.</p>
         </div>
     </div>
 </body>

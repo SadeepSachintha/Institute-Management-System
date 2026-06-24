@@ -90,7 +90,7 @@ export default function SettingsPanel({ showMessage }) {
                                     value={settingsForm.institution_name}
                                     onChange={(e) => setSettingsForm({ ...settingsForm, institution_name: e.target.value })}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                    placeholder="e.g. SS Labz Academy of Science"
+                                    placeholder="e.g. Academy of Science"
                                     required
                                 />
                             </div>
@@ -101,7 +101,7 @@ export default function SettingsPanel({ showMessage }) {
                                     value={settingsForm.domain_url}
                                     onChange={(e) => setSettingsForm({ ...settingsForm, domain_url: e.target.value })}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                    placeholder="e.g. ss-labz.pages.dev"
+                                    placeholder="e.g. example.com"
                                     required
                                 />
                             </div>
