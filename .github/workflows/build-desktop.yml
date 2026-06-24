@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
     - name: Checkout code
@@ -31,7 +34,6 @@ jobs:
       id: composer-cache
       run: |
         echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-      shell: bash
 
     - name: Cache Composer dependencies
       uses: actions/cache@v4
@@ -45,7 +47,7 @@ jobs:
       run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
     - name: Copy Env File
-      run: copy .env.example .env
+      run: cp .env.example .env
 
     - name: Generate App Key
       run: php artisan key:generate
