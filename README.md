@@ -150,7 +150,11 @@ For development safety and to prevent conflicting with existing default database
    ```powershell
    d:\xampp\php\php.exe artisan migrate:fresh --seed
    ```
-2. Install Javascript dependencies and build client SPA assets:
+2. Create the symbolic link for uploaded public storage documents:
+   ```powershell
+   d:\xampp\php\php.exe artisan storage:link
+   ```
+3. Install Javascript dependencies and build client SPA assets:
    ```powershell
    npm install
    npm run build
@@ -160,7 +164,7 @@ For development safety and to prevent conflicting with existing default database
    $env:Path += ";C:\Program Files\nodejs"
    & "C:\Program Files\nodejs\npm.cmd" run build
    ```
-3. Start the Laravel development server:
+4. Start the Laravel development server:
    ```powershell
    d:\xampp\php\php.exe artisan serve --port=8000
    ```
@@ -184,8 +188,10 @@ This option packages the Institute Management System as a native standalone desk
 #### Step 1: Start the Local Desktop Development App
 Running this command boots the React frontend inside an Electron desktop window, initializes a portable local database (using SQLite), and automatically launches the Python analytics FastAPI sidecar server silently in the background:
 ```powershell
+./php.bat artisan storage:link
 ./php.bat artisan native:serve
 ```
+*(Note: Running `storage:link` beforehand ensures uploaded applicant documents can be successfully viewed locally.)*
 
 #### Step 2: Build the Production Executable
 To package the entire application (including UI resources, PHP binaries, and local configurations) into a single standalone program installer (`IMS.exe` for Windows, `IMS.app` for Mac):
@@ -236,8 +242,13 @@ The compiled standalone executable installer will be generated in the `dist/` di
 ---
 
 ### 3. Core Automated Tests
-To run the automated backend validations for the Bulk CSV Importer:
+To run all automated backend integration and unit tests (validating CSV import, student enrollment, document verification, timetable overlaps, and PDF streams):
 ```powershell
+./php.bat artisan test
+```
+To filter by specific modules:
+```powershell
+./php.bat artisan test --filter=ImsTest
 ./php.bat artisan test --filter=BulkGradeImportTest
 ```
 
