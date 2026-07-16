@@ -49,6 +49,24 @@ class SSOController extends Controller
             ]);
         }
 
+        // Ensure student profile exists for student role
+        if ($user->role === 'student') {
+            $profileExists = \App\Models\Student::where('user_id', $user->id)->exists();
+            if (!$profileExists) {
+                $year = date('Y');
+                $random = rand(1000, 9999);
+                $studentId = "TEMP-{$year}-{$random}";
+
+                \App\Models\Student::create([
+                    'user_id' => $user->id,
+                    'student_id' => $studentId,
+                    'status' => 'applicant',
+                    'academic_history' => 'SSO Onboarded Student',
+                    'demographic_data' => 'OAuth Registered',
+                ]);
+            }
+        }
+
         // Ensure Spatie role is assigned if roles are seeded
         try {
             if (class_exists(\Spatie\Permission\Models\Role::class)) {

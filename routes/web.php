@@ -26,6 +26,23 @@ Route::get('/', function () {
 
 // React Dashboard SPA Page
 Route::get('/dashboard', function () {
+    $user = auth()->user();
+    if ($user && $user->role === 'student') {
+        $profileExists = \App\Models\Student::where('user_id', $user->id)->exists();
+        if (!$profileExists) {
+            $year = date('Y');
+            $random = rand(1000, 9999);
+            $studentId = "TEMP-{$year}-{$random}";
+
+            \App\Models\Student::create([
+                'user_id' => $user->id,
+                'student_id' => $studentId,
+                'status' => 'applicant',
+                'academic_history' => 'SSO Onboarded Student',
+                'demographic_data' => 'OAuth Registered',
+            ]);
+        }
+    }
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
