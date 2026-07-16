@@ -21,5 +21,14 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+
+        if (class_exists(\Laravel\Socialite\Facades\Socialite::class)) {
+            \Laravel\Socialite\Facades\Socialite::extend('keycloak', function ($app) {
+                $config = $app['config']['services.keycloak'];
+                return \Laravel\Socialite\Facades\Socialite::buildProvider(
+                    \App\Services\KeycloakProvider::class, $config
+                );
+            });
+        }
     }
 }

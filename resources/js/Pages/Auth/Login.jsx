@@ -131,6 +131,19 @@ export default function Login({ status, canResetPassword }) {
                     </button>
                 </form>
 
+                <div className="relative flex py-3 items-center">
+                    <div className="flex-grow border-t border-slate-800/80"></div>
+                    <span className="flex-shrink mx-3 text-4xs text-slate-600 uppercase tracking-widest">Or authenticate via</span>
+                    <div className="flex-grow border-t border-slate-800/80"></div>
+                </div>
+
+                <a
+                    href={route('auth.sso.redirect')}
+                    className="w-full py-3 border border-indigo-500/30 hover:border-indigo-500/60 bg-indigo-950/20 text-indigo-300 font-bold rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 hover:bg-indigo-950/40 active:scale-[0.98] cursor-pointer mb-2"
+                >
+                    🔑 Sign In with Keycloak SSO
+                </a>
+
                 {/* Interactive Demo Credentials Selector Panel */}
                 <div className="mt-8 pt-6 border-t border-slate-800/80">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-4 text-center">

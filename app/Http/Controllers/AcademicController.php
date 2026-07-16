@@ -34,7 +34,9 @@ class AcademicController extends Controller
      */
     public function getTimetable()
     {
-        $timetable = Timetable::with(['batch.course', 'faculty.user'])->get();
+        $timetable = \Illuminate\Support\Facades\Cache::remember('timetable_all', 3600, function () {
+            return Timetable::with(['batch.course', 'faculty.user'])->get();
+        });
         return response()->json($timetable);
     }
 
@@ -116,6 +118,9 @@ class AcademicController extends Controller
 
         $slot = Timetable::create($request->all());
 
+        // Invalidate cached timetable
+        \Illuminate\Support\Facades\Cache::forget('timetable_all');
+
         return response()->json([
             'success' => true,
             'message' => 'Class scheduled successfully.',
@@ -170,29 +175,9 @@ class AcademicController extends Controller
                 ['status' => $status, 'parent_alert_sent' => $parentAlert]
             );
 
-            // Log / simulate automated notification trigger
+            // Asynchronously dispatch parent absence alert via Redis queue
             if ($parentAlert) {
-                $student = Student::with('user', 'parents.user')->find($studentId);
-                $studentName = $student->user->name;
-                
-                foreach ($student->parents as $p) {
-                    $parentEmail = $p->user->email;
-                    
-                    try {
-                        $p->user->notify(new AbsenceNotification(
-                            $studentName,
-                            $student->student_id,
-                            $date,
-                            $subjectName
-                        ));
-                    } catch (\Exception $e) {
-                        Log::error("Failed to send absence notification to {$parentEmail}: " . $e->getMessage());
-                    }
-
-                    Log::channel('single')->warning(
-                        "PARENT ALERT SENT to {$parentEmail}: Your child {$studentName} was marked ABSENT for timetable slot #{$timetableId} on {$date}."
-                    );
-                }
+                \App\Jobs\SendAbsenceAlert::dispatch($attendance);
             }
 
             $results[] = $attendance;
@@ -211,9 +196,13 @@ class AcademicController extends Controller
     public function getGrades($studentId = null)
     {
         if ($studentId) {
-            $grades = Grade::where('student_id', $studentId)->get();
+            $grades = \Illuminate\Support\Facades\Cache::remember("grades_student_{$studentId}", 3600, function () use ($studentId) {
+                return Grade::where('student_id', $studentId)->get();
+            });
         } else {
-            $grades = Grade::with('student.user')->get();
+            $grades = \Illuminate\Support\Facades\Cache::remember('grades_all', 3600, function () {
+                return Grade::with('student.user')->get();
+            });
         }
         return response()->json($grades);
     }
@@ -233,6 +222,10 @@ class AcademicController extends Controller
         ]);
 
         $grade = Grade::create($request->all());
+
+        // Invalidate grades cache
+        \Illuminate\Support\Facades\Cache::forget("grades_student_{$grade->student_id}");
+        \Illuminate\Support\Facades\Cache::forget('grades_all');
 
         try {
             AuditLog::create([
@@ -629,7 +622,12 @@ class AcademicController extends Controller
                         'new_values' => $grade->toArray(),
                         'ip_address' => $request->ip(),
                     ]);
+                    // Invalidate grades cache per student
+                    \Illuminate\Support\Facades\Cache::forget("grades_student_{$grade->student_id}");
                 }
+                
+                // Invalidate total grades cache
+                \Illuminate\Support\Facades\Cache::forget('grades_all');
             });
         } catch (\Exception $e) {
             Log::error("Failed during bulk grade import database transaction: " . $e->getMessage());

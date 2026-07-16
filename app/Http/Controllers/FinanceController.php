@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\AuditLog;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class FinanceController extends Controller
 {
@@ -166,30 +168,15 @@ class FinanceController extends Controller
             'student_ids.*' => 'required|exists:students,id',
         ]);
 
-        $fee = Fee::findOrFail($request->fee_id);
-        $createdCount = 0;
-
-        foreach ($request->student_ids as $studentId) {
-            // Check if already billed for this fee
-            $exists = Invoice::where('student_id', $studentId)
-                ->where('fee_id', $fee->id)
-                ->exists();
-
-            if (!$exists) {
-                Invoice::create([
-                    'student_id' => $studentId,
-                    'fee_id' => $fee->id,
-                    'amount' => $fee->amount,
-                    'discount' => 0.00,
-                    'status' => 'unpaid'
-                ]);
-                $createdCount++;
-            }
-        }
+        // Dispatches the billing generation asynchronously to background queue
+        \App\Jobs\GenerateStudentBilling::dispatch(
+            intval($request->fee_id), 
+            $request->student_ids
+        );
 
         return response()->json([
             'success' => true,
-            'message' => "Successfully generated {$createdCount} invoices for this fee category."
+            'message' => "Batch invoice generation has been queued in the background."
         ]);
     }
 
@@ -264,6 +251,107 @@ class FinanceController extends Controller
         $pdf = Pdf::loadView('pdf.receipt', $data);
 
         return $pdf->stream("Receipt_{$payment->transaction_reference}.pdf");
+    }
+
+    /**
+     * Generate Stripe Checkout Session.
+     */
+    public function createStripeSession(Request $request)
+    {
+        $request->validate([
+            'invoice_id' => 'required|exists:invoices,id',
+        ]);
+
+        $invoice = Invoice::with(['student.user', 'fee'])->findOrFail($request->invoice_id);
+        $netAmount = ($invoice->amount - $invoice->discount);
+
+        if ($netAmount <= 0) {
+            return response()->json(['error' => 'Invoice has no outstanding balance'], 400);
+        }
+
+        // Initialize Stripe SDK
+        \Stripe\Stripe::setApiKey(env('STRIPE_SECRET') ?? 'sk_test_mock_stripe_key_placeholder_for_local_env');
+
+        try {
+            $session = \Stripe\Checkout\Session::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'usd',
+                        'product_data' => [
+                            'name' => "IMS Tuition Fee: {$invoice->fee->name}",
+                            'description' => "Invoice #{$invoice->id} for {$invoice->student->user->name}",
+                        ],
+                        'unit_amount' => $netAmount * 100, // Stripe expects cents
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => url('/dashboard?payment=success&invoice=' . $invoice->id),
+                'cancel_url' => url('/dashboard?payment=cancelled'),
+                'metadata' => [
+                    'invoice_id' => $invoice->id,
+                ],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'checkout_url' => $session->url,
+            ]);
+        } catch (\Exception $e) {
+            // Local fallback simulation if Stripe credentials are blank
+            if (empty(env('STRIPE_SECRET'))) {
+                Log::info("Mock Stripe key used. Simulating success url redirection locally.");
+                // Return a mock checkout URL that points back to a simulator route or local success route
+                $mockSessionUrl = url('/api/finance/pay/mock-stripe-callback?invoice_id=' . $invoice->id . '&amount=' . $netAmount);
+                return response()->json([
+                    'success' => true,
+                    'checkout_url' => $mockSessionUrl,
+                ]);
+            }
+            return response()->json(['error' => 'Stripe Session generation failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Local Stripe webhook simulator endpoint.
+     */
+    public function mockStripeCallback(Request $request)
+    {
+        $request->validate([
+            'invoice_id' => 'required|exists:invoices,id',
+            'amount' => 'required|numeric',
+        ]);
+
+        $invoiceId = $request->invoice_id;
+        $amount = $request->amount;
+        
+        $webhookUrl = route('stripe.webhook');
+        
+        $payload = [
+            'type' => 'checkout.session.completed',
+            'data' => [
+                'object' => [
+                    'id' => 'cs_test_mock_' . Str::random(10),
+                    'amount_total' => $amount * 100,
+                    'metadata' => [
+                        'invoice_id' => $invoiceId
+                    ]
+                ]
+            ]
+        ];
+
+        // Send a post request internally to our webhook controller
+        $client = new \GuzzleHttp\Client();
+        try {
+            $client->post($webhookUrl, [
+                'json' => $payload
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Mock webhook POST failed: " . $e->getMessage());
+        }
+
+        return redirect('/dashboard?payment=success&invoice=' . $invoiceId);
     }
 }
 

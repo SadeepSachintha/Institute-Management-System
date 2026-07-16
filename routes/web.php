@@ -8,6 +8,8 @@ use App\Http\Controllers\FacultyController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\SystemSettingsController;
+use App\Http\Controllers\Auth\SSOController;
+use App\Http\Controllers\WebhookController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -56,6 +58,7 @@ Route::middleware('auth')->group(function () {
     // 3. Finance & Invoicing
     Route::get('/api/finance', [FinanceController::class, 'getFinancialDashboard']);
     Route::post('/api/finance/pay', [FinanceController::class, 'processSandboxPayment']);
+    Route::post('/api/finance/stripe-checkout', [FinanceController::class, 'createStripeSession']);
     Route::post('/api/finance/bill-batch', [FinanceController::class, 'generateBatchBilling']);
     Route::get('/api/finance/invoices/{id}/pdf', [FinanceController::class, 'downloadInvoicePdf']);
     Route::get('/api/finance/payments/{id}/pdf', [FinanceController::class, 'downloadReceiptPdf']);
@@ -78,5 +81,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/settings', [SystemSettingsController::class, 'getSettings']);
     Route::post('/api/settings', [SystemSettingsController::class, 'saveSettings']);
 });
+
+// Stripe Webhook Endpoint
+Route::post('/stripe/webhook', [WebhookController::class, 'handleStripe'])->name('stripe.webhook');
+Route::get('/api/finance/pay/mock-stripe-callback', [FinanceController::class, 'mockStripeCallback']);
+
+// SSO Routes
+Route::get('/auth/sso/redirect', [SSOController::class, 'redirectToProvider'])->name('auth.sso.redirect');
+Route::get('/auth/sso/callback', [SSOController::class, 'handleProviderCallback'])->name('auth.sso.callback');
+Route::get('/auth/sso/mock', [SSOController::class, 'handleMockLogin'])->name('auth.sso.mock');
 
 require __DIR__.'/auth.php';

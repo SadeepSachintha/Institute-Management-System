@@ -18,6 +18,23 @@ export default function StudentPanel({
     // Filter payments / invoices for this student
     const sInvoices = sProfile && finance ? finance.invoices.filter((i) => i.student_id === sProfile.id) : [];
 
+    const handleStripeCheckout = async () => {
+        if (!paymentForm.invoice_id) {
+            alert('Please select an invoice first.');
+            return;
+        }
+        try {
+            const res = await axios.post('/api/finance/stripe-checkout', {
+                invoice_id: paymentForm.invoice_id
+            });
+            if (res.data.checkout_url) {
+                window.location.href = res.data.checkout_url;
+            }
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to initiate Stripe Checkout.');
+        }
+    };
+
     return (
         <div className="w-full">
             {/* TAB: MY PROFILE (Student) */}
@@ -288,9 +305,16 @@ export default function StudentPanel({
                                 </div>
                                 <button
                                     type="submit"
-                                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition shadow-lg shadow-emerald-650/20"
+                                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition mb-2"
                                 >
-                                    Process Online Payment
+                                    Process Sandbox Payment
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleStripeCheckout}
+                                    className="w-full py-2.5 bg-gradient-to-r from-indigo-650 to-sky-655 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/30 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/10"
+                                >
+                                    💳 Pay with Stripe Checkout
                                 </button>
                             </form>
                         </div>

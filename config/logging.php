@@ -123,6 +123,12 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        'telemetry' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/telemetry.log'),
+            'level' => 'info',
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

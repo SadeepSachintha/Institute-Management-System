@@ -63,6 +63,32 @@ services:
     networks:
       - ims-network
 
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - ims-network
+
+  queue:
+    image: ims-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+    command: php artisan queue:work --tries=3
+    depends_on:
+      - app
+      - redis
+    networks:
+      - ims-network
+
 volumes:
   ims-db-data:
 
