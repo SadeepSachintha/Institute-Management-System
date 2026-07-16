@@ -522,7 +522,7 @@ export default function Dashboard() {
                             )}
 
                             {role === 'admin' && activeTab === 'finance' && (
-                                <FinancePanel finance={finance} />
+                                <FinancePanel finance={finance} loadTabData={loadTabData} />
                             )}
 
                             {role === 'admin' && activeTab === 'hr' && (
@@ -585,6 +585,7 @@ export default function Dashboard() {
                                     setPaymentForm={setPaymentForm}
                                     handleSandboxPayment={handleSandboxPayment}
                                     calculateCGPA={calculateCGPA}
+                                    loadTabData={loadTabData}
                                 />
                             )}
 

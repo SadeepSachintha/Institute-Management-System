@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Invoice extends Model
 {
-    protected $fillable = ['student_id', 'fee_id', 'amount', 'discount', 'status'];
+    protected $fillable = ['student_id', 'fee_id', 'amount', 'discount', 'status', 'slip_path'];
 
     public function student(): BelongsTo
     {

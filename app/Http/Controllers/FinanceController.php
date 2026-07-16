@@ -353,6 +353,165 @@ class FinanceController extends Controller
 
         return redirect('/dashboard?payment=success&invoice=' . $invoiceId);
     }
+
+    /**
+     * Upload Bank deposit receipt slip.
+     */
+    public function uploadSlip(Request $request, $id)
+    {
+        $request->validate([
+            'slip' => 'required|file|mimes:jpeg,png,jpg,pdf|max:4096',
+        ]);
+
+        $invoice = Invoice::findOrFail($id);
+
+        if ($invoice->status === 'paid') {
+            return response()->json(['error' => 'Invoice is already paid'], 400);
+        }
+
+        if ($request->hasFile('slip')) {
+            $path = $request->file('slip')->store('slips', 'public');
+            
+            $invoice->update([
+                'slip_path' => '/storage/' . $path,
+                'status' => 'pending_verification'
+            ]);
+
+            try {
+                \App\Models\AuditLog::create([
+                    'user_id' => auth()->id(),
+                    'action' => 'uploaded_bank_slip',
+                    'auditable_type' => Invoice::class,
+                    'auditable_id' => $invoice->id,
+                    'old_values' => null,
+                    'new_values' => ['slip_path' => $invoice->slip_path],
+                    'ip_address' => $request->ip(),
+                ]);
+            } catch (\Exception $e) {
+                Log::error("Failed to log bank slip upload audit: " . $e->getMessage());
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Bank deposit slip uploaded successfully. Pending administrator verification.',
+                'invoice' => $invoice
+            ]);
+        }
+
+        return response()->json(['error' => 'No file uploaded'], 400);
+    }
+
+    /**
+     * Approve or reject a pending bank deposit slip.
+     */
+    public function verifySlip(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:approve,reject',
+            'remarks' => 'nullable|string|max:255'
+        ]);
+
+        return DB::transaction(function () use ($request, $id) {
+            $invoice = Invoice::findOrFail($id);
+
+            if ($invoice->status !== 'pending_verification') {
+                return response()->json(['error' => 'Invoice has no pending verification slip'], 400);
+            }
+
+            $action = $request->status;
+
+            if ($action === 'approve') {
+                $netAmount = $invoice->amount - $invoice->discount;
+                
+                $ref = 'TXN-BANK-' . strtoupper(bin2hex(random_bytes(4)));
+                $payment = Payment::create([
+                    'invoice_id' => $invoice->id,
+                    'amount_paid' => $netAmount,
+                    'payment_method' => 'Bank Transfer',
+                    'transaction_reference' => $ref,
+                    'payment_date' => Carbon::now(),
+                ]);
+
+                $invoice->update([
+                    'status' => 'paid'
+                ]);
+
+                $student = Student::with('user')->find($invoice->student_id);
+                $workflowTriggered = false;
+                $generatedId = null;
+
+                if (in_array($student->status, ['applicant', 'inquiry'])) {
+                    $year = date('Y');
+                    $count = Student::where('student_id', 'like', "STU-{$year}-%")
+                        ->where('status', 'enrolled')
+                        ->count();
+                        
+                    $sequence = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+                    $generatedId = "STU-{$year}-{$sequence}";
+
+                    $student->update([
+                        'status' => 'enrolled',
+                        'student_id' => $generatedId
+                    ]);
+
+                    $workflowTriggered = true;
+                }
+
+                try {
+                    \App\Models\AuditLog::create([
+                        'user_id' => auth()->id(),
+                        'action' => 'approved_bank_slip',
+                        'auditable_type' => Invoice::class,
+                        'auditable_id' => $invoice->id,
+                        'old_values' => ['status' => 'pending_verification'],
+                        'new_values' => ['status' => 'paid', 'payment_id' => $payment->id],
+                        'ip_address' => $request->ip(),
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("Failed to log bank slip approval audit: " . $e->getMessage());
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Bank slip approved successfully. Invoice marked as paid.',
+                    'invoice' => $invoice,
+                    'workflow' => [
+                        'triggered' => $workflowTriggered,
+                        'status' => $student->status,
+                        'student_id' => $generatedId,
+                        'student_name' => $student->user->name
+                    ]
+                ]);
+
+            } else {
+                $oldSlip = $invoice->slip_path;
+                $invoice->update([
+                    'status' => 'unpaid',
+                    'slip_path' => null
+                ]);
+
+                try {
+                    \App\Models\AuditLog::create([
+                        'user_id' => auth()->id(),
+                        'action' => 'rejected_bank_slip',
+                        'auditable_type' => Invoice::class,
+                        'auditable_id' => $invoice->id,
+                        'old_values' => ['status' => 'pending_verification', 'slip_path' => $oldSlip],
+                        'new_values' => ['status' => 'unpaid', 'remarks' => $request->remarks],
+                        'ip_address' => $request->ip(),
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("Failed to log bank slip rejection audit: " . $e->getMessage());
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Bank slip rejected. Invoice status returned to unpaid.',
+                    'invoice' => $invoice
+                ]);
+            }
+        });
+    }
 }
 
 // Helper to format float values in messages

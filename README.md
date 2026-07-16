@@ -15,14 +15,16 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 
 ### 2. Academic & Course Management
 * **Collision Timetable Scheduler:** Course scheduling with double-booking checks on faculty, room, and student batch cohorts.
-* **Database & Mail Alerts:** Absences and leave status approvals trigger database logs and mock emails via Laravel's notification channel framework.
+* **Asynchronous Notifications:** Absences and leave status approvals trigger database logs and mock emails via Laravel's notification channel framework, dispatched via background queue workers.
 * **Gradebook:** Configurable assessment parameters, weighting calculations, and cumulative GPA logs.
 * **Bulk Grade Importer:** Drag-and-drop CSV importer with flexible header matching, client-side pre-parsing previews, and transaction-controlled rollbacks.
 * **PDF Report Card Generator:** Auto-calculates cumulative percentages, GPAs, and cohort rankings, exporting transcripts to printable PDF reports.
 
-### 3. Financial & Fee Management
+### 3. Financial & Fee Management (Stripe & Bank Slip Uploads)
 * **Automated Billing:** Dynamic tuition, library, and transportation fee invoicing.
-* **Tuition Sandbox Portal:** A payment simulation sandbox for students/parents to process outstanding dues and get instant digital receipts.
+* **Stripe Checkout Integration:** Redirects payments securely to official Stripe Checkout sessions. A custom webhook handler (`/stripe/webhook`) listens to successful sessions to process tuition.
+* **Bank Slip Upload Portal (Free Alternative):** Students can upload deposit receipts/PDFs directly, placing invoices in `pending_verification` to avoid payment gateway fees.
+* **Admin Verification Overlay:** Admins review pending slips via a preview modal, approve/reject transactions, and dynamically register bank transfer payments.
 * **PDF Invoice & Receipt Exporter:** Generates verified billing invoices and payment receipts in a styled HSL print template.
 * **Revenue Dashboard:** Premium HSL-gradient interactive Area charts tracking collections, paid invoices, and outstanding balances.
 
@@ -30,10 +32,17 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 * **Leave Requests:** Approval workflow for leaves with workloads mapping.
 * **Faculty Profiles:** Qualifications tracker, department assignments, and teaching hour capacities.
 
-### 5. Branding & Live Configuration
-* **Live Settings Manager:** Admin settings to dynamically manage institution branding, URL references, and grade threshold boundaries.
+### 5. Single Sign-On (SSO) & Role-Based Access Control (RBAC)
+* **Keycloak OAuth2 SSO:** Integrated Socialite OpenID Connect login flows for unified dashboard access, with an automatic local mock login fallback for development.
+* **Spatie Permissions & Roles:** Protects backend endpoints and frontend layouts using Spatie's RBAC system (`admin`, `faculty`, `student`, `parent`).
 
-### 6. AI Analytics & Early Warning System
+### 6. Caching & Performance
+* **Redis Cache-Aside:** wrapped timetables and grade transcript queries in a high-speed Redis caching layer, with automatic invalidation triggers on grade entries or scheduling updates.
+
+### 7. Observability & OpenTelemetry
+* **Structured Performance Tracing:** Global middleware monitors request latencies, memory footprints, and database queries count, saving standard OpenTelemetry JSON telemetry logs to `storage/logs/telemetry.log`.
+
+### 8. AI Analytics & Early Warning System
 * **Early Warning Explainability:** scikit-learn `LogisticRegression` model flags dropout risks and returns SHAP-like feature contributions (attendance, grades, lateness, absences) mapped onto graphical progress meters.
 * **Seasonality-Aware Forecasts:** Predicts enrollments using Classical Additive Time-Series Decomposition to model term-based peaks.
 * **Global Toast Center:** Real-time stackable visual notifications alerting administrators and faculty of onboarding workflows, attendance logs, and invoice payments.
@@ -45,44 +54,13 @@ The **Institute Management System (IMS)** is a modern, cloud-based platform desi
 | Component | Technology | Role |
 | --- | --- | --- |
 | **Core Backend** | Laravel 12.x | Secure MVC framework, notifications channels, polymorphic audit logging, and Eloquent ORM. |
-| **Frontend** | React SPA (Inertia.js) + Recharts | Reactive views with role-based panels, expandable risk explanator rows, and interactive data visualizations. |
+| **SSO & Auth** | Keycloak OAuth2 + Socialite | Identity federation and role assignments. |
+| **Performance** | Redis Alpine | Queue worker driver and fast cache-aside memory store. |
+| **Payment Gateway** | Stripe SDK | Checkout Session integrations and webhook processors. |
+| **Frontend** | React SPA (Inertia.js) + Recharts | Reactive views with role-based panels, expandable risk explainer rows, and interactive data visualizations. |
 | **CSS Styling** | Tailwind CSS / HSL CSS | Unified dark-theme glassmorphism layout, custom SVG academic emblem, custom form widgets, and glow indicators. |
-| **MLOps & Analytics** | Python 3.14 + FastAPI + SQLAlchemy | Machine learning pipeline, classical additive seasonal forecaster, SHAP explainer engine, and SQLAlchemy `QueuePool` database connection pooling. |
+| **MLOps & Analytics** | Python 3.14 + FastAPI + SQLAlchemy | Machine learning pipeline, classical additive seasonal forecaster, SHAP explainer engine, and connection pooling. |
 | **Database** | MariaDB / MySQL | Relational data store, configured on custom port `3307` for environment safety. |
-
----
-
-## 📁 Project Structure
-
-```text
-Institute Management System/
-├── analytics/              # Python FastAPI microservice
-│   ├── .venv/              # Local Python virtual environment
-│   ├── model.py            # Logistic Regression ML model (scikit-learn)
-│   ├── main.py             # FastAPI Server & database connection
-│   ├── requirements.txt    # Python packages list
-│   └── Dockerfile          # Microservice Docker container mapping
-├── app/                    # Laravel controllers, models, middlewares
-├── config/                 # Laravel configs
-├── database/               # Migrations & database seeders
-├── public/                 # Built assets
-├── resources/              # React SPA Pages, Components, and Layouts
-│   ├── js/
-│   │   ├── Components/     # Shared components and role-based dashboard views
-│   │   │   └── Dashboard/  # SisPanel, FinancePanel, HrPanel, AnalyticsPanel, etc.
-│   │   ├── Contexts/       # React Contexts (ToastContext for global alerts)
-│   │   ├── Layouts/        # AuthenticatedLayout and GuestLayout
-│   │   ├── Pages/          # Client view screens (Dashboard.jsx, Welcome.jsx)
-│   │   └── app.jsx
-│   └── css/
-├── routes/                 # Web routes (Blade / Inertia) and API endpoints
-├── package.json            # Vite asset compiler packages
-├── composer.json           # Laravel PHP packages
-├── Dockerfile              # Laravel PHP-FPM container mapping
-├── nginx.conf              # Nginx server container mapping
-├── docker-compose.yml      # Orchestrates all Docker services
-└── README.md
-```
 
 ---
 
@@ -98,7 +76,7 @@ Ensure you have **Docker** and **Docker Compose** installed.
    ```bash
    docker-compose up -d --build
    ```
-   This will boot the database (`db`), Laravel server (`app`), reverse proxy (`web`), and Python analytics engine (`analytics`).
+   This will boot the database (`db`), Laravel server (`app`), reverse proxy (`web`), Redis cache (`redis`), queue worker (`queue`), and Python analytics engine (`analytics`).
 
 2. **Run migrations and seed the database** inside the running app container:
    ```bash
@@ -115,6 +93,7 @@ The application is now accessible at:
 * **Laravel Web Portal:** `http://localhost:8000`
 * **Python FastAPI Docs:** `http://localhost:8080/docs`
 * **MySQL/MariaDB Host Connection:** `127.0.0.1:3307`
+* **Redis Host Connection:** `127.0.0.1:6379`
 
 To stop the containers:
 ```bash
@@ -123,7 +102,7 @@ docker-compose down
 
 ---
 
-### Option B: Bare-Metal Setup (XAMPP / Local Python)
+### Option B: Bare-Metal Setup (XAMPP / Local Python / Standalone DB)
 
 #### Prerequisites
 * **PHP 8.2+** (contained in XAMPP)
@@ -138,7 +117,7 @@ For development safety and to prevent conflicting with existing default database
    ```
 2. Start the database process:
    ```powershell
-   Start-Process -FilePath "d:\xampp\mysql\bin\mysqld.exe" -ArgumentList "--datadir=d:\xampp\mysql\data-ims --port=3307 --standalone" -WindowStyle Hidden
+   Start-Process -FilePath "d:\xampp\mysql\bin\mysqld.exe" -ArgumentList "--no-defaults --datadir=d:\xampp\mysql\data-ims --port=3307 --standalone" -WindowStyle Hidden
    ```
 3. Create the database:
    ```powershell
@@ -150,7 +129,7 @@ For development safety and to prevent conflicting with existing default database
    ```powershell
    d:\xampp\php\php.exe artisan migrate:fresh --seed
    ```
-2. Create the symbolic link for uploaded public storage documents:
+2. Create the symbolic link for uploaded public storage documents and slips:
    ```powershell
    d:\xampp\php\php.exe artisan storage:link
    ```
@@ -158,11 +137,6 @@ For development safety and to prevent conflicting with existing default database
    ```powershell
    npm install
    npm run build
-   ```
-   *Note: If node/npm are not in your system's PATH on Windows, you can locate them under `C:\Program Files\nodejs` and execute:*
-   ```powershell
-   $env:Path += ";C:\Program Files\nodejs"
-   & "C:\Program Files\nodejs\npm.cmd" run build
    ```
 4. Start the Laravel development server:
    ```powershell
@@ -181,32 +155,6 @@ For development safety and to prevent conflicting with existing default database
 
 ---
 
-### Option C: Standalone Desktop Packaging (NativePHP)
-
-This option packages the Institute Management System as a native standalone desktop app (using Electron) that runs locally on target PCs offline.
-
-#### Step 1: Start the Local Desktop Development App
-Running this command boots the React frontend inside an Electron desktop window, initializes a portable local database (using SQLite), and automatically launches the Python analytics FastAPI sidecar server silently in the background:
-```powershell
-./php.bat artisan storage:link
-./php.bat artisan native:serve
-```
-*(Note: Running `storage:link` beforehand ensures uploaded applicant documents can be successfully viewed locally.)*
-
-#### Step 2: Build the Production Executable (Local Pipeline)
-To clean caches, optimize dependencies, prune dev logs, and compile frontend assets before bundling the desktop application:
-```powershell
-powershell -ExecutionPolicy Bypass -File ./build-pipeline.ps1
-```
-The generated standalone installer will be output to the `dist/` directory.
-
-#### Step 3: CI/CD Pipeline & Automatic Code Signing
-The application includes a pre-configured GitHub Actions build workflow to compile the installer on clean cloud runner VMs:
-* **Workflow File**: [.github/workflows/build-desktop.yml](file:///d:/xampp/htdocs/Institute%20Management%20System/.github/workflows/build-desktop.yml)
-* **Automatic Signing**: Add a base64 encoded PFX certificate string as `CSC_LINK` and its password as `CSC_KEY_PASSWORD` under repository Secrets. The runner will sign the `.exe` dynamically during build.
-
----
-
 ## 🧪 Verification & Demo Testing
 
 ### 1. Verification Login Credentials
@@ -221,21 +169,19 @@ The application includes a pre-configured GitHub Actions build workflow to compi
 
 ### 2. Manual Verification Guides
 
+#### 🏦 Bank Slip Manual Payment Verification Portal
+1. **Student Slip Upload:** Log in as Student Alice Cooper (`alice@ims.com`). Navigate to the **Tuition** view, select an invoice, and upload a bank deposit slip receipt. The invoice status updates to `pending_verification`.
+2. **Admin Verify:** Log in as Admin (`admin@ims.com`), go to the **Financial Ledger & Invoices** view. Pending slips will appear in the verification dashboard checklist. Click **Verify Slip** to review the file, insert remarks, and click **Approve & Mark Paid**.
+3. Verify that the system automatically registers a bank transfer payment, upgrades Alice's status to `enrolled`, and generates her Student ID.
+
 #### 🖨️ PDF Invoice, Receipt, & Report Card Exporters
 1. **Students**: Log in as student John Doe (`john@ims.com`). Navigate to the **Grades** view and click **Download Report Card (PDF)** to print the transcript. Navigate to the **Tuition** view and click **Download Invoice (PDF)** or **Download Receipt (PDF)** for transaction details.
 2. **Administrators**: Log in as Admin (`admin@ims.com`), go to **SIS Central Registry** or **Financial Ledger** and download official report cards, invoices, and receipt PDFs for any student.
 
-#### ⚙️ Live System Settings & Branding Manager
-1. Log in as Admin (`admin@ims.com`), navigate to the **Branding & Settings** tab in the main sidebar.
-2. Change the Institution Name (e.g. to a custom name) and Institution Website URL. Click **Save Settings**.
-3. Observe that the branding change immediately propagates to the dashboard headers and all downloaded PDF headers.
-4. Modify the letter grading thresholds (A+, A, B, C) and verify that transcript GPAs adapt to the modified thresholds dynamically.
-
 #### 🔍 Interactive Audit Log Explorer & Exporter
 1. Log in as Admin (`admin@ims.com`), navigate to the **SIS Central Registry** tab and scroll to the **Institutional Audit Trail**.
 2. Click any log row to expand it. Inspect the side-by-side JSON diff viewer highlighting changes in Old vs New states.
-3. Use the filter bar to search by Actor name, filter by specific actions (e.g. `'processed_payment'`), or filter by Date range.
-4. Click **Export CSV** to stream and download the filtered activity logs as a spreadsheet.
+3. Click **Export CSV** to stream and download the filtered activity logs as a spreadsheet.
 
 #### 📥 Bulk Grade Book CSV Importer
 1. Log in as Faculty Dr. Alan Turing (`alan@ims.com`), navigate to the **Gradebook** tab.
@@ -249,12 +195,11 @@ The application includes a pre-configured GitHub Actions build workflow to compi
 ### 3. Core Automated Tests
 To run all automated backend integration and unit tests (validating CSV import, student enrollment, document verification, timetable overlaps, and PDF streams):
 ```powershell
-./php.bat artisan test
+d:\xampp\php\php.exe artisan test
 ```
 To filter by specific modules:
 ```powershell
-./php.bat artisan test --filter=ImsTest
-./php.bat artisan test --filter=BulkGradeImportTest
+d:\xampp\php\php.exe artisan test --filter=ImsTest
 ```
 
 ---

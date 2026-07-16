@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export default function StudentPanel({
     activeTab,
@@ -10,13 +10,46 @@ export default function StudentPanel({
     paymentForm,
     setPaymentForm,
     handleSandboxPayment,
-    calculateCGPA
+    calculateCGPA,
+    loadTabData
 }) {
     const sProfile = students.find((s) => s.user_id === user.id);
     const sGrades = sProfile ? grades.filter((g) => g.student_id === sProfile.id) : [];
 
     // Filter payments / invoices for this student
     const sInvoices = sProfile && finance ? finance.invoices.filter((i) => i.student_id === sProfile.id) : [];
+
+    const [slipFile, setSlipFile] = useState(null);
+    const [uploadingSlip, setUploadingSlip] = useState(false);
+
+    const handleSlipSubmit = async (e) => {
+        e.preventDefault();
+        if (!slipFile || !paymentForm.invoice_id) return;
+
+        setUploadingSlip(true);
+        const formData = new FormData();
+        formData.append('slip', slipFile);
+
+        try {
+            const res = await axios.post(`/api/finance/invoices/${paymentForm.invoice_id}/upload-slip`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+            if (res.data.success) {
+                alert(res.data.message);
+                setSlipFile(null);
+                setPaymentForm({ ...paymentForm, invoice_id: '' });
+                if (loadTabData) {
+                    loadTabData();
+                }
+            }
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to upload bank slip.');
+        } finally {
+            setUploadingSlip(false);
+        }
+    };
 
     const handleStripeCheckout = async () => {
         if (!paymentForm.invoice_id) {
@@ -254,69 +287,115 @@ export default function StudentPanel({
                     </div>
 
                     <div>
-                        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-xl p-6">
-                            <h3 className="text-lg font-bold text-white mb-4">Sandbox Payment Portal</h3>
-                            <form onSubmit={handleSandboxPayment} className="space-y-4">
-                                <div>
-                                    <label className="text-xs text-slate-400 block mb-1">Select Invoice</label>
-                                    <select
-                                        value={paymentForm.invoice_id}
-                                        onChange={(e) => {
-                                            const invId = e.target.value;
-                                            const matching = finance.invoices.find((i) => i.id === parseInt(invId));
-                                            setPaymentForm({
-                                                ...paymentForm,
-                                                invoice_id: invId,
-                                                amount_paid: matching ? (matching.amount - matching.discount).toString() : ''
-                                            });
-                                        }}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                        required
-                                    >
-                                        <option value="">Choose invoice...</option>
-                                        {sInvoices.filter((i) => i.status !== 'paid').map((i) => (
-                                            <option key={i.id} value={i.id}>
-                                                {i.fee?.name} (${i.amount - i.discount})
-                                            </option>
-                                        ))}
-                                    </select>
+                        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-xl p-6 space-y-6">
+                            <div>
+                                <h3 className="text-lg font-bold text-white mb-2">Payment Portal</h3>
+                                <p className="text-xs text-slate-500 mb-4">Select an invoice to proceed with checkout or submit bank transfer slip.</p>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs text-slate-400 block mb-1">Select Invoice</label>
+                                        <select
+                                            value={paymentForm.invoice_id}
+                                            onChange={(e) => {
+                                                const invId = e.target.value;
+                                                const matching = finance.invoices.find((i) => i.id === parseInt(invId));
+                                                setPaymentForm({
+                                                    ...paymentForm,
+                                                    invoice_id: invId,
+                                                    amount_paid: matching ? (matching.amount - matching.discount).toString() : ''
+                                                });
+                                            }}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                            required
+                                        >
+                                            <option value="">Choose invoice...</option>
+                                            {sInvoices.filter((i) => i.status !== 'paid' && i.status !== 'pending_verification').map((i) => (
+                                                <option key={i.id} value={i.id}>
+                                                    {i.fee?.name} (${i.amount - i.discount})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    
+                                    {paymentForm.invoice_id && (
+                                        <div className="border-t border-slate-800/80 pt-4 space-y-4">
+                                            {/* Option A: Stripe Checkout */}
+                                            <div>
+                                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Option A: Instant Checkout</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleStripeCheckout}
+                                                    className="w-full py-2.5 bg-gradient-to-r from-indigo-650 to-sky-655 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/30 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/10 cursor-pointer"
+                                                >
+                                                    💳 Pay with Stripe Checkout
+                                                </button>
+                                            </div>
+                                            
+                                            {/* Option B: Bank Slip Upload */}
+                                            <div className="border-t border-slate-800/50 pt-4">
+                                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Option B: Bank Transfer Slip Upload</span>
+                                                <form onSubmit={handleSlipSubmit} className="space-y-3">
+                                                    <div className="flex items-center justify-center w-full">
+                                                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-800 border-dashed rounded-lg cursor-pointer bg-slate-950/40 hover:bg-slate-950/80 transition-all duration-200">
+                                                            <div className="flex flex-col items-center justify-center pt-3 pb-3">
+                                                                <svg className="w-6 h-6 text-slate-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                                </svg>
+                                                                <p className="text-3xs text-slate-400"><span className="font-semibold text-indigo-400">Click to upload</span> slip image/PDF</p>
+                                                                <p className="text-4xs text-slate-600 mt-0.5">JPEG, PNG, or PDF (Max 4MB)</p>
+                                                            </div>
+                                                            <input
+                                                                type="file"
+                                                                className="hidden"
+                                                                onChange={(e) => setSlipFile(e.target.files[0])}
+                                                                accept="image/*,application/pdf"
+                                                                required
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                    {slipFile && (
+                                                        <div className="flex items-center justify-between text-2xs bg-slate-950 border border-slate-850 px-3 py-1.5 rounded-lg text-slate-300">
+                                                            <span className="truncate max-w-[180px] font-mono">{slipFile.name}</span>
+                                                            <button type="button" onClick={() => setSlipFile(null)} className="text-rose-400 hover:text-rose-350 font-bold">×</button>
+                                                        </div>
+                                                    )}
+                                                    <button
+                                                        type="submit"
+                                                        disabled={uploadingSlip}
+                                                        className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold transition cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        {uploadingSlip ? 'Uploading...' : 'Submit Bank Slip'}
+                                                    </button>
+                                                </form>
+                                            </div>
+
+                                            {/* Option C: Sandbox Card */}
+                                            <div className="border-t border-slate-800/50 pt-4">
+                                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Option C: Sandbox Simulation</span>
+                                                <form onSubmit={handleSandboxPayment} className="space-y-3">
+                                                    <div>
+                                                        <input
+                                                            type="text"
+                                                            value={paymentForm.card_number}
+                                                            onChange={(e) => setPaymentForm({ ...paymentForm, card_number: e.target.value })}
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono tracking-widest text-center"
+                                                            placeholder="Card Number"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="submit"
+                                                        className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                    >
+                                                        Pay via Sandbox Card
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                                <div>
-                                    <label className="text-xs text-slate-400 block mb-1">Amount to Pay ($)</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={paymentForm.amount_paid}
-                                        onChange={(e) => setPaymentForm({ ...paymentForm, amount_paid: e.target.value })}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-slate-400 block mb-1">Card Number (Sandbox Simulation)</label>
-                                    <input
-                                        type="text"
-                                        value={paymentForm.card_number}
-                                        onChange={(e) => setPaymentForm({ ...paymentForm, card_number: e.target.value })}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono tracking-widest text-center"
-                                        placeholder="4111 2222 3333 4444"
-                                        required
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-semibold transition mb-2"
-                                >
-                                    Process Sandbox Payment
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleStripeCheckout}
-                                    className="w-full py-2.5 bg-gradient-to-r from-indigo-650 to-sky-655 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/30 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/10"
-                                >
-                                    💳 Pay with Stripe Checkout
-                                </button>
-                            </form>
+                            </div>
                         </div>
                     </div>
                 </div>

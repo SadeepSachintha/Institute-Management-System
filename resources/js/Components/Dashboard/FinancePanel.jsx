@@ -1,8 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import axios from 'axios';
 
-export default function FinancePanel({ finance }) {
+export default function FinancePanel({ finance, loadTabData }) {
     if (!finance) return null;
+
+    const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [remarks, setRemarks] = useState('');
+    const [verifying, setVerifying] = useState(false);
+
+    const handleVerifyAction = async (status) => {
+        if (!selectedInvoice) return;
+        setVerifying(true);
+        try {
+            const res = await axios.post(`/api/finance/invoices/${selectedInvoice.id}/verify-slip`, {
+                status,
+                remarks
+            });
+            if (res.data.success) {
+                alert(res.data.message);
+                setSelectedInvoice(null);
+                setRemarks('');
+                if (loadTabData) {
+                    loadTabData();
+                }
+            }
+        } catch (err) {
+            alert(err.response?.data?.error || 'Failed to update slip status.');
+        } finally {
+            setVerifying(false);
+        }
+    };
 
     // Transform trend data to numeric values for correct rendering in Recharts
     const chartData = finance.revenue_trend.map((item) => ({
@@ -25,8 +53,49 @@ export default function FinancePanel({ finance }) {
         return null;
     };
 
+    const pendingInvoices = finance.invoices.filter((i) => i.status === 'pending_verification');
+
     return (
         <div className="space-y-6 animate-fade-in">
+            {/* Pending Verifications section */}
+            {pendingInvoices.length > 0 && (
+                <div className="bg-slate-900/50 backdrop-blur-md border border-amber-500/20 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500/50" />
+                    <h3 className="text-base font-bold text-amber-400 mb-4 flex items-center gap-2">
+                        ⚠️ Pending Bank Slip Verifications ({pendingInvoices.length})
+                    </h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm text-slate-400">
+                            <thead className="bg-slate-950 text-slate-300 border-b border-slate-800">
+                                <tr>
+                                    <th className="py-2 px-3 font-semibold">Student</th>
+                                    <th className="py-2 px-3 font-semibold">Fee Category</th>
+                                    <th className="py-2 px-3 font-semibold">Amount</th>
+                                    <th className="py-2 px-3 font-semibold text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/30">
+                                {pendingInvoices.map((inv) => (
+                                    <tr key={inv.id} className="hover:bg-slate-800/10 transition">
+                                        <td className="py-2 px-3 text-white font-medium">{inv.student?.user?.name}</td>
+                                        <td className="py-2 px-3 text-indigo-300">{inv.fee?.name}</td>
+                                        <td className="py-2 px-3 font-semibold text-slate-200">${inv.amount - inv.discount}</td>
+                                        <td className="py-2 px-3 text-right">
+                                            <button
+                                                onClick={() => setSelectedInvoice(inv)}
+                                                className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                                            >
+                                                Verify Slip
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             {/* Metrics summary cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-lg">
@@ -158,6 +227,87 @@ export default function FinancePanel({ finance }) {
                     </div>
                 </div>
             </div>
+
+            {/* Modal overlay for verification review */}
+            {selectedInvoice && (
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl relative animate-fade-in">
+                        <div className="flex justify-between items-center">
+                            <h4 className="text-base font-bold text-white">Review Bank Deposit Slip</h4>
+                            <button
+                                onClick={() => { setSelectedInvoice(null); setRemarks(''); }}
+                                className="text-slate-400 hover:text-white font-bold text-lg cursor-pointer"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="bg-slate-950 rounded-xl p-3 border border-slate-850 text-xs text-slate-300 grid grid-cols-2 gap-3">
+                                <div>
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-widest block">Student Name</span>
+                                    <span className="font-semibold text-white">{selectedInvoice.student?.user?.name}</span>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-widest block">Fee Category</span>
+                                    <span className="font-semibold text-indigo-300">{selectedInvoice.fee?.name}</span>
+                                </div>
+                                <div className="col-span-2">
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-widest block">Amount Billed</span>
+                                    <span className="font-bold text-white">${selectedInvoice.amount - selectedInvoice.discount}</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-950 rounded-xl border border-slate-850 p-2 overflow-hidden flex justify-center items-center h-64">
+                                {selectedInvoice.slip_path && selectedInvoice.slip_path.toLowerCase().endsWith('.pdf') ? (
+                                    <a
+                                        href={selectedInvoice.slip_path}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-indigo-400 hover:underline font-mono"
+                                    >
+                                        📄 Open PDF Slip File in New Tab
+                                    </a>
+                                ) : (
+                                    <img
+                                        src={selectedInvoice.slip_path}
+                                        alt="Deposit Slip Receipt"
+                                        className="max-h-full max-w-full object-contain rounded"
+                                    />
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="text-xs text-slate-400 block mb-1">Rejection Remarks (Optional)</label>
+                                <input
+                                    type="text"
+                                    placeholder="Reason for rejection..."
+                                    value={remarks}
+                                    onChange={(e) => setRemarks(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 justify-end pt-2">
+                                <button
+                                    onClick={() => handleVerifyAction('reject')}
+                                    disabled={verifying}
+                                    className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                                >
+                                    Reject Slip
+                                </button>
+                                <button
+                                    onClick={() => handleVerifyAction('approve')}
+                                    disabled={verifying}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                                >
+                                    Approve & Mark Paid
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

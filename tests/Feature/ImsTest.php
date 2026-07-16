@@ -228,5 +228,83 @@ class ImsTest extends TestCase
         $response->assertHeader('Content-Type', 'application/pdf');
         $response->assertHeader('Content-Disposition', 'inline; filename=Receipt_' . $payment->transaction_reference . '.pdf');
     }
+
+    /**
+     * Test student can upload bank slip.
+     */
+    public function test_student_can_upload_bank_slip()
+    {
+        $this->actingAs($this->student->user);
+
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        $file = \Illuminate\Http\UploadedFile::fake()->image('slip.jpg');
+
+        $response = $this->postJson("/api/finance/invoices/{$this->invoice->id}/upload-slip", [
+            'slip' => $file
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('invoice.status', 'pending_verification');
+        
+        $freshInvoice = Invoice::find($this->invoice->id);
+        $this->assertEquals('pending_verification', $freshInvoice->status);
+        $this->assertNotNull($freshInvoice->slip_path);
+    }
+
+    /**
+     * Test admin can approve bank slip.
+     */
+    public function test_admin_can_approve_bank_slip()
+    {
+        $this->invoice->update([
+            'status' => 'pending_verification',
+            'slip_path' => '/storage/slips/test.jpg'
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $response = $this->postJson("/api/finance/invoices/{$this->invoice->id}/verify-slip", [
+            'status' => 'approve'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('invoice.status', 'paid');
+        $response->assertJsonPath('workflow.triggered', true);
+
+        // Verify payment record exists in DB
+        $this->assertDatabaseHas('payments', [
+            'invoice_id' => $this->invoice->id,
+            'payment_method' => 'Bank Transfer'
+        ]);
+        
+        $freshStudent = Student::find($this->student->id);
+        $this->assertEquals('enrolled', $freshStudent->status);
+    }
+
+    /**
+     * Test admin can reject bank slip.
+     */
+    public function test_admin_can_reject_bank_slip()
+    {
+        $this->invoice->update([
+            'status' => 'pending_verification',
+            'slip_path' => '/storage/slips/test.jpg'
+        ]);
+
+        $this->actingAs($this->adminUser);
+
+        $response = $this->postJson("/api/finance/invoices/{$this->invoice->id}/verify-slip", [
+            'status' => 'reject',
+            'remarks' => 'Slip image is blurry.'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('invoice.status', 'unpaid');
+        $this->assertNull(Invoice::find($this->invoice->id)->slip_path);
+    }
 }
 

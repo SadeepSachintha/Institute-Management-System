@@ -59,6 +59,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/finance', [FinanceController::class, 'getFinancialDashboard']);
     Route::post('/api/finance/pay', [FinanceController::class, 'processSandboxPayment']);
     Route::post('/api/finance/stripe-checkout', [FinanceController::class, 'createStripeSession']);
+    Route::post('/api/finance/invoices/{id}/upload-slip', [FinanceController::class, 'uploadSlip']);
+    Route::post('/api/finance/invoices/{id}/verify-slip', [FinanceController::class, 'verifySlip']);
     Route::post('/api/finance/bill-batch', [FinanceController::class, 'generateBatchBilling']);
     Route::get('/api/finance/invoices/{id}/pdf', [FinanceController::class, 'downloadInvoicePdf']);
     Route::get('/api/finance/payments/{id}/pdf', [FinanceController::class, 'downloadReceiptPdf']);
