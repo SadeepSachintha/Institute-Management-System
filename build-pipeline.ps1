@@ -24,7 +24,7 @@ if (Test-Path $seedFlag) {
 
 # 3. Optimize PHP Composer dependencies
 Write-Host "[3/5] Installing optimized production Composer autoloader..." -ForegroundColor Yellow
-& "./composer.bat" install --no-dev --optimize-autoloader --prefer-dist --no-interaction
+& "./composer.bat" install --no-dev --optimize-autoloader --prefer-dist --no-interaction --ignore-platform-reqs
 
 # 4. Compile frontend assets freshly and deterministically
 Write-Host "[4/5] Compiling production frontend assets deterministically..." -ForegroundColor Yellow
@@ -37,7 +37,11 @@ if (Test-Path "package-lock.json") {
 
 # 5. Run NativePHP Electron packaging
 Write-Host "[5/5] Packaging standalone desktop application with Electron..." -ForegroundColor Yellow
+if (Test-Path "public/storage") {
+    Remove-Item "public/storage" -Force -Recurse -ErrorAction SilentlyContinue
+}
 & "./php.bat" artisan native:build win x64 --no-interaction
+& "./php.bat" artisan storage:link
 
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host "Build complete! Check the 'dist/' directory for installer packages." -ForegroundColor Green
